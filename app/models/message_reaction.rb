@@ -7,7 +7,7 @@ class MessageReaction < ApplicationRecord
   validates :emoji, inclusion: { in: ALLOWED_EMOJIS }
   validates :user_id, uniqueness: { scope: [ :message_id, :emoji ] }
 
-  after_create_commit  :broadcast_reaction_update
+  after_create_commit :broadcast_reaction_update
   after_destroy_commit :broadcast_reaction_update
 
   def self.grouped_for(message)

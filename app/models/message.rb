@@ -30,8 +30,8 @@ class Message < ApplicationRecord
   scope :recent,   -> { order(created_at: :asc) }
   scope :not_deleted, -> { where(deleted_at: nil) }
 
-  after_create_commit  :broadcast_to_participants
-  after_create_commit  :touch_conversation
+  after_create_commit :broadcast_to_participants
+  after_create_commit :touch_conversation
   after_destroy_commit :broadcast_deletion
 
   def reactions_grouped

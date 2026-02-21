@@ -11,7 +11,7 @@ class MarketingCampaign < ApplicationRecord
   def total_count    = campaign_deliveries.count
   def queued_count   = campaign_deliveries.status_queued.count
   def sent_count     = campaign_deliveries.status_sent.count
-  def delivered_count= campaign_deliveries.status_delivered.count
+  def delivered_count = campaign_deliveries.status_delivered.count
   def read_count     = campaign_deliveries.status_read.count
   def clicked_count  = campaign_deliveries.status_clicked.count
   def failed_count   = campaign_deliveries.status_failed.count
