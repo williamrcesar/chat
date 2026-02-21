@@ -73,7 +73,7 @@ Rails.application.routes.draw do
 
   # Company namespace — dashboard, attendants, settings, assignments
   namespace :company do
-    get  "dashboard",  to: "dashboard#index",  as: :dashboard
+    get "dashboard", to: "dashboard#index", as: :dashboard
     resource  :settings, only: %i[ show edit update ]
 
     resources :attendants do
