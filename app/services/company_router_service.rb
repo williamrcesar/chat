@@ -30,17 +30,15 @@ class CompanyRouterService
   def send_menu_to(customer_user)
     conversation = Conversation.find_or_create_company_direct(company, customer_user)
 
-    # Build the message content
-    list_sections = [{
-      "title" => "Departamentos",
-      "rows"  => company.departments.map do |dept|
-        {
-          "id"    => dept["id"] || dept[:id],
-          "title" => dept["label"] || dept[:label],
-          "desc"  => dept["role_name"] || dept[:role_name]
-        }
-      end
-    }]
+    # Build department rows first (avoids do..end block inside a hash literal)
+    dept_rows = company.departments.map { |dept|
+      {
+        "id"    => dept["id"]       || dept[:id],
+        "title" => dept["label"]    || dept[:label],
+        "desc"  => dept["role_name"] || dept[:role_name]
+      }
+    }
+    list_sections = [ { "title" => "Departamentos", "rows" => dept_rows } ]
 
     msg = conversation.messages.create!(
       sender:       company.owner,
@@ -56,16 +54,16 @@ class CompanyRouterService
       a.status = :pending
     end
 
-    # Store menu metadata for routing later — attach to message metadata
+    # Store menu metadata for routing later — attached to message metadata
     msg.update_column(:metadata, {
-      "company_menu" => true,
-      "company_id"   => company.id,
-      "assignment_id"=> assignment.id,
-      "list_sections"=> list_sections,
-      "list_header"  => { "text" => "Escolha um departamento" }
+      "company_menu"  => true,
+      "company_id"    => company.id,
+      "assignment_id" => assignment.id,
+      "list_sections" => list_sections,
+      "list_header"   => { "text" => "Escolha um departamento" }
     })
 
-    [conversation, assignment, msg]
+    [ conversation, assignment, msg ]
   end
 
   private

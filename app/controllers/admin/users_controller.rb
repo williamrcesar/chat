@@ -1,6 +1,6 @@
 module Admin
   class UsersController < BaseController
-    before_action :set_user, only: %i[show edit update destroy toggle_admin]
+    before_action :set_user, only: %i[ show edit update destroy toggle_admin ]
 
     def index
       @pagy, @users = pagy(

@@ -1,6 +1,6 @@
 module Marketing
   class CampaignsController < BaseController
-    before_action :set_campaign, only: %i[show launch pause deliveries]
+    before_action :set_campaign, only: %i[ show launch pause deliveries ]
 
     def index
       @campaigns = current_user.marketing_campaigns

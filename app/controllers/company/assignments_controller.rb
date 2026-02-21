@@ -1,10 +1,10 @@
 module Company
   class AssignmentsController < BaseController
-    before_action :set_assignment, only: %i[show transfer resolve]
+    before_action :set_assignment, only: %i[ show transfer resolve ]
 
     def index
       @assignments = @current_company.conversation_assignments
-                                     .includes(:conversation, :company_attendant => :user)
+                                     .includes(:conversation, company_attendant: :user)
                                      .order(created_at: :desc)
 
       # Filter by status

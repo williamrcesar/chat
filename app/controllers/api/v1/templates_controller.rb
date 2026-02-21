@@ -1,7 +1,7 @@
 module Api
   module V1
     class TemplatesController < BaseController
-      before_action :set_template, only: %i[show update destroy]
+      before_action :set_template, only: %i[ show update destroy ]
 
       def index
         @templates = Template.order(:category, :name)

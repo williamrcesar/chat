@@ -1,7 +1,7 @@
 module Company
   class AttendantsController < BaseController
-    before_action :require_supervisor!, only: %i[new create destroy]
-    before_action :set_attendant, only: %i[show edit update destroy toggle_status]
+    before_action :require_supervisor!, only: %i[ new create destroy ]
+    before_action :set_attendant, only: %i[ show edit update destroy toggle_status ]
 
     def index
       @attendants = @current_company.company_attendants.includes(:user).order(:role_name)

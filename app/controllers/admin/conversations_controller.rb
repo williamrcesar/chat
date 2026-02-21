@@ -1,6 +1,6 @@
 module Admin
   class ConversationsController < BaseController
-    before_action :set_conversation, only: %i[show destroy]
+    before_action :set_conversation, only: %i[ show destroy ]
 
     def index
       @pagy, @conversations = pagy(

@@ -14,6 +14,6 @@ class CreateCampaignDeliveries < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :campaign_deliveries, %i[campaign_id recipient_user_id], unique: true
+    add_index :campaign_deliveries, %i[ campaign_id recipient_user_id ], unique: true
   end
 end

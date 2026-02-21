@@ -1,5 +1,5 @@
 class ConversationsController < ApplicationController
-  before_action :set_conversation, only: %i[show add_participant remove_participant archive unarchive toggle_pin]
+  before_action :set_conversation, only: %i[ show add_participant remove_participant archive unarchive toggle_pin ]
 
   def index
     @conversations = current_user.conversations

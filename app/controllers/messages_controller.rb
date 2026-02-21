@@ -1,6 +1,6 @@
 class MessagesController < ApplicationController
   before_action :set_conversation
-  before_action :set_message, only: %i[delete_for_everyone]
+  before_action :set_message, only: %i[ delete_for_everyone ]
 
   def create
     @message = @conversation.messages.build(message_params)

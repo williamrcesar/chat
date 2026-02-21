@@ -1,5 +1,5 @@
 class CompaniesController < ApplicationController
-  before_action :set_company, only: %i[show]
+  before_action :set_company, only: %i[ show ]
 
   # GET /companies/new
   def new
