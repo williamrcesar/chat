@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <title><%= content_for(:title) || "Marketing — Chat" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="bg-[#111b21] text-white min-h-screen">
+    <%# Top nav %>
+    <nav class="bg-[#202c33] border-b border-[#2a3942] px-6 py-3 flex items-center gap-4">
+      <%= link_to root_path, class: "flex items-center gap-2 text-[#8696a0] hover:text-white transition-colors text-sm" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Chat
+      <% end %>
+
+      <span class="text-[#2a3942]">|</span>
+
+      <%= link_to marketing_templates_path,
+            class: "text-sm #{request.path.start_with?('/marketing/templates') ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+        Templates
+      <% end %>
+
+      <%= link_to marketing_campaigns_path,
+            class: "text-sm #{request.path.start_with?('/marketing/campaigns') ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+        Campanhas
+      <% end %>
+
+      <div class="ml-auto flex items-center gap-3">
+        <span class="text-[#8696a0] text-sm"><%= current_user.display_name %></span>
+        <%= link_to destroy_user_session_path, data: { turbo_method: :delete },
+              class: "text-[#8696a0] hover:text-red-400 text-sm transition-colors" do %>
+          Sair
+        <% end %>
+      </div>
+    </nav>
+
+    <% if notice %>
+      <div data-controller="flash"
+           class="fixed top-4 right-4 z-50 bg-[#00a884] text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-sm">
+        <%= notice %>
+      </div>
+    <% end %>
+    <% if alert %>
+      <div data-controller="flash"
+           class="fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-sm">
+        <%= alert %>
+      </div>
+    <% end %>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+      <%= yield %>
+    </main>
+  </body>
+</html>

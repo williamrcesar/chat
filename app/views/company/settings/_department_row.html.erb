@@ -1,0 +1,27 @@
+<%# Reusable row for a department in the menu editor %>
+<div class="flex items-center gap-2 bg-[#2a3942] rounded-lg px-3 py-2"
+     data-company-menu-target="deptRow">
+  <div class="w-2 h-2 rounded-full bg-[#00a884] flex-shrink-0"></div>
+  <input type="text"
+         class="flex-1 bg-transparent text-white text-sm outline-none placeholder-[#8696a0]"
+         placeholder="Ex: Suporte"
+         data-company-menu-target="deptLabel"
+         data-action="input->company-menu#updatePreview"
+         value="<%= dept["label"] %>">
+  <span class="text-[#8696a0] text-xs">role_name:</span>
+  <input type="text"
+         class="w-28 bg-[#1a242a] text-[#d1d7db] text-xs rounded px-2 py-1 outline-none"
+         placeholder="Ex: Suporte"
+         data-company-menu-target="deptRole"
+         value="<%= dept["role_name"] %>">
+  <input type="hidden"
+         data-company-menu-target="deptId"
+         value="<%= dept["id"].presence || "dept_#{index}" %>">
+  <button type="button"
+          data-action="click->company-menu#removeDepartment"
+          class="text-[#8696a0] hover:text-red-400 transition-colors ml-1">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+</div>

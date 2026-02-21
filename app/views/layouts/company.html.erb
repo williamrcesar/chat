@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <title><%= content_for(:title) || "#{@current_company&.name} — Painel" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="bg-[#111b21] text-white min-h-screen">
+    <%# Top nav %>
+    <nav class="bg-[#202c33] border-b border-[#2a3942] px-6 py-3 flex items-center gap-4">
+      <%# Company logo + name %>
+      <div class="flex items-center gap-3 mr-4">
+        <% if @current_company&.logo&.attached? %>
+          <%= image_tag @current_company.logo, class: "w-8 h-8 rounded-full object-cover" %>
+        <% else %>
+          <div class="w-8 h-8 rounded-full bg-[#00a884] flex items-center justify-center text-white font-bold text-sm">
+            <%= @current_company&.name&.first&.upcase %>
+          </div>
+        <% end %>
+        <span class="text-white font-semibold text-sm"><%= @current_company&.name %></span>
+        <span class="text-[#8696a0] text-xs">@<%= @current_company&.nickname %></span>
+      </div>
+
+      <span class="text-[#2a3942]">|</span>
+
+      <%= link_to company_dashboard_path,
+            class: "text-sm #{request.path == company_dashboard_path ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+        Dashboard
+      <% end %>
+
+      <%= link_to company_attendants_path,
+            class: "text-sm #{request.path.start_with?('/company/attendants') ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+        Atendentes
+      <% end %>
+
+      <%= link_to company_assignments_path,
+            class: "text-sm #{request.path.start_with?('/company/assignments') ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+        Atendimentos
+      <% end %>
+
+      <% if @current_company&.supervisor?(current_user) %>
+        <%= link_to company_settings_path,
+              class: "text-sm #{request.path.start_with?('/company/settings') ? 'text-[#00a884] font-semibold' : 'text-[#8696a0] hover:text-white'} transition-colors" do %>
+          Configurações
+        <% end %>
+      <% end %>
+
+      <div class="ml-auto flex items-center gap-3">
+        <%= link_to root_path, class: "text-[#8696a0] hover:text-white text-sm transition-colors" do %>
+          ← Chat
+        <% end %>
+        <span class="text-[#8696a0] text-sm"><%= current_user.display_name %></span>
+      </div>
+    </nav>
+
+    <% if notice %>
+      <div data-controller="flash"
+           class="fixed top-4 right-4 z-50 bg-[#00a884] text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-sm">
+        <%= notice %>
+      </div>
+    <% end %>
+    <% if alert %>
+      <div data-controller="flash"
+           class="fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-sm">
+        <%= alert %>
+      </div>
+    <% end %>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+      <%= yield %>
+    </main>
+  </body>
+</html>

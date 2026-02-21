@@ -1,0 +1,67 @@
+<% content_for :title, @user.display_name %>
+
+<div class="flex items-center gap-4 mb-6">
+  <%= link_to "← Usuários", admin_users_path, class: "text-[#58a6ff] hover:underline text-sm" %>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6">
+    <div class="flex flex-col items-center text-center mb-6">
+      <div class="w-20 h-20 rounded-full bg-[#30363d] flex items-center justify-center text-white text-3xl font-bold mb-3">
+        <%= @user.display_name.first.upcase %>
+      </div>
+      <h2 class="text-white font-semibold text-lg"><%= @user.display_name %></h2>
+      <p class="text-[#8b949e] text-sm"><%= @user.email %></p>
+      <% if @user.role_admin? %>
+        <span class="mt-2 text-xs bg-[#1f6feb]/20 text-[#58a6ff] px-2 py-1 rounded-full border border-[#1f6feb]/30">Admin</span>
+      <% end %>
+    </div>
+
+    <div class="space-y-3 text-sm">
+      <div class="flex justify-between">
+        <span class="text-[#8b949e]">Telefone</span>
+        <span class="text-white"><%= @user.phone.presence || "—" %></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-[#8b949e]">Status</span>
+        <span class="<%= @user.online? ? 'text-green-400' : 'text-[#8b949e]' %>">
+          <%= @user.online? ? "Online" : @user.display_last_seen %>
+        </span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-[#8b949e]">Cadastro</span>
+        <span class="text-white"><%= @user.created_at.strftime("%d/%m/%Y") %></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-[#8b949e]">Conversas</span>
+        <span class="text-white"><%= @user.conversations.count %></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-[#8b949e]">Mensagens</span>
+        <span class="text-white"><%= @user.sent_messages.count %></span>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mt-6">
+      <%= button_to toggle_admin_admin_user_path(@user), method: :patch,
+            class: "flex-1 py-2 rounded-lg text-sm font-medium transition-colors #{@user.role_admin? ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20' : 'bg-[#1f6feb]/10 text-[#58a6ff] border border-[#1f6feb]/20 hover:bg-[#1f6feb]/20'}" do %>
+        <%= @user.role_admin? ? "Remover admin" : "Tornar admin" %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2 bg-[#161b22] border border-[#30363d] rounded-xl p-6">
+    <h3 class="text-white font-semibold mb-4">Conversas</h3>
+    <div class="space-y-2">
+      <% @user.conversations.includes(:messages).order(updated_at: :desc).limit(10).each do |conv| %>
+        <div class="flex items-center justify-between p-3 bg-[#21262d] rounded-lg">
+          <div>
+            <p class="text-white text-sm"><%= conv.name || "Conversa ##{conv.id}" %></p>
+            <p class="text-[#8b949e] text-xs"><%= conv.conversation_type %> · <%= conv.messages.count %> msgs</p>
+          </div>
+          <%= link_to "Ver", admin_conversation_path(conv), class: "text-[#58a6ff] text-xs hover:underline" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

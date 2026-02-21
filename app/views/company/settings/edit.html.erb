@@ -1,0 +1,96 @@
+<% content_for :title, "Editar Configurações" %>
+
+<div class="max-w-3xl"
+     data-controller="company-menu"
+     data-company-menu-departments-value="<%= @company.departments.to_json %>">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-white">Editar Configurações</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Personalize o perfil e o menu de atendimento</p>
+  </div>
+
+  <%= form_with model: [:company, :settings], url: company_settings_path, method: :patch,
+                multipart: true, class: "space-y-6" do |f| %>
+    <%# Hidden menu JSON %>
+    <input type="hidden" name="menu_json" id="menu_json_field">
+
+    <%# Company Info %>
+    <div class="bg-[#202c33] rounded-xl p-5">
+      <h2 class="text-white text-sm font-semibold mb-4">Informações da Empresa</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Nome *</label>
+          <%= f.text_field :name, value: @company.name,
+                class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Descrição</label>
+          <%= f.text_area :description, value: @company.description, rows: 2,
+                class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884] resize-none" %>
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Logo</label>
+          <%= f.file_field :logo, accept: "image/*", class: "text-[#8696a0] text-sm" %>
+        </div>
+      </div>
+    </div>
+
+    <%# Menu Editor %>
+    <div class="bg-[#202c33] rounded-xl p-5">
+      <h2 class="text-white text-sm font-semibold mb-4">Menu de Atendimento</h2>
+
+      <div class="mb-4">
+        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Mensagem de saudação</label>
+        <input type="text" id="menu_greeting"
+               value="<%= @company.greeting %>"
+               data-company-menu-target="greeting"
+               placeholder="Olá! Como podemos te ajudar?"
+               class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+      </div>
+
+      <div class="mb-3">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[#8696a0] text-xs font-semibold uppercase tracking-wide">Departamentos</label>
+          <button type="button"
+                  data-action="click->company-menu#addDepartment"
+                  class="bg-[#2a3942] hover:bg-[#3b4a54] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            + Adicionar
+          </button>
+        </div>
+
+        <div id="departments-container" data-company-menu-target="departments" class="space-y-2">
+          <% @company.departments.each_with_index do |dept, i| %>
+            <%= render "company/settings/department_row",
+                  dept: dept, index: i %>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Live Preview %>
+      <div class="mt-4 bg-[#0b141a] rounded-xl p-4">
+        <p class="text-[#8696a0] text-xs font-semibold mb-2 uppercase tracking-wide">Pré-visualização</p>
+        <div class="bg-[#202c33] rounded-xl p-4 max-w-xs">
+          <p class="text-[#d1d7db] text-sm mb-3" data-company-menu-target="previewGreeting">
+            <%= @company.greeting %>
+          </p>
+          <div class="border-t border-[#2a3942] pt-2 space-y-1" data-company-menu-target="previewDepts">
+            <% @company.departments.each do |dept| %>
+              <button class="w-full text-left text-[#00a884] text-sm py-1.5 px-2 hover:bg-[#2a3942] rounded transition-colors">
+                <%= dept["label"] %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit"
+              data-action="click->company-menu#serializeMenu"
+              class="flex-1 bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer">
+        Salvar Configurações
+      </button>
+      <%= link_to "Cancelar", company_settings_path,
+            class: "px-5 py-3 text-[#8696a0] hover:text-white text-sm font-semibold rounded-lg border border-[#2a3942] transition-colors" %>
+    </div>
+  <% end %>
+</div>

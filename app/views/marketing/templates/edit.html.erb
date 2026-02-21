@@ -1,0 +1,15 @@
+<% content_for :title, "Editar Template" %>
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-white">Editar: <%= @template.name %></h1>
+    <p class="text-[#8696a0] text-sm mt-1">Criado <%= time_ago_in_words(@template.created_at) %> atrás</p>
+  </div>
+  <%= button_to marketing_template_path(@template), method: :delete,
+        data: { confirm: "Tem certeza que deseja remover este template?" },
+        class: "text-red-400 hover:text-red-300 text-sm border border-red-400/30 hover:border-red-300/50 px-3 py-1.5 rounded-lg transition-colors" do %>
+    Remover template
+  <% end %>
+</div>
+
+<%= render "marketing/templates/form", template: @template %>

@@ -1,0 +1,88 @@
+<% content_for :title, "Usuários" %>
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-white">Usuários</h1>
+  <span class="text-[#8b949e] text-sm"><%= @pagy.count %> total</span>
+</div>
+
+<%# Search %>
+<div class="mb-4">
+  <%= form_with url: admin_users_path, method: :get, class: "flex gap-2" do |f| %>
+    <%= f.text_field :q, value: @q, placeholder: "Buscar por nome ou email...",
+          class: "flex-1 bg-[#21262d] text-white placeholder-[#8b949e] rounded-lg px-4 py-2 text-sm outline-none border border-[#30363d] focus:border-[#58a6ff]" %>
+    <%= f.submit "Buscar", class: "bg-[#21262d] hover:bg-[#30363d] text-white px-4 py-2 rounded-lg text-sm border border-[#30363d] cursor-pointer transition-colors" %>
+  <% end %>
+</div>
+
+<div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-[#30363d] bg-[#21262d]">
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Usuário</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Email</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Status</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Cadastro</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Ações</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-[#21262d]">
+      <% @users.each do |user| %>
+        <tr class="hover:bg-[#21262d] transition-colors">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-[#30363d] flex items-center justify-center text-white text-xs font-semibold">
+                <%= user.display_name.first.upcase %>
+              </div>
+              <div>
+                <p class="text-white font-medium"><%= user.display_name %></p>
+                <% if user.role_admin? %>
+                  <span class="text-[10px] bg-[#1f6feb]/20 text-[#58a6ff] px-1.5 py-0.5 rounded">admin</span>
+                <% end %>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-[#8b949e]"><%= user.email %></td>
+          <td class="px-4 py-3">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full <%= user.online? ? 'bg-green-400' : 'bg-[#30363d]' %>"></span>
+              <span class="text-[#8b949e] text-xs"><%= user.online? ? "Online" : "Offline" %></span>
+            </span>
+          </td>
+          <td class="px-4 py-3 text-[#8b949e] text-xs"><%= user.created_at.strftime("%d/%m/%Y") %></td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <%= link_to "Ver", admin_user_path(user),
+                    class: "text-[#58a6ff] hover:underline text-xs" %>
+              <%= button_to toggle_admin_admin_user_path(user), method: :patch,
+                    class: "text-xs #{user.role_admin? ? 'text-orange-400 hover:text-orange-300' : 'text-[#8b949e] hover:text-white'} transition-colors" do %>
+                <%= user.role_admin? ? "Remover admin" : "Tornar admin" %>
+              <% end %>
+              <% if user != current_user %>
+                <%= button_to admin_user_path(user), method: :delete,
+                      data: { turbo_confirm: "Remover #{user.display_name} permanentemente?" },
+                      class: "text-xs text-red-400 hover:text-red-300 transition-colors" do %>
+                  Remover
+                <% end %>
+              <% end %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<%# Pagination %>
+<% if @pagy.pages > 1 %>
+  <div class="flex items-center justify-center gap-2 mt-6">
+    <% if @pagy.prev %>
+      <%= link_to "← Anterior", admin_users_path(page: @pagy.prev, q: @q),
+            class: "px-3 py-1.5 bg-[#21262d] border border-[#30363d] rounded text-sm text-white hover:bg-[#30363d] transition-colors" %>
+    <% end %>
+    <span class="text-[#8b949e] text-sm">Página <%= @pagy.page %> de <%= @pagy.pages %></span>
+    <% if @pagy.next %>
+      <%= link_to "Próxima →", admin_users_path(page: @pagy.next, q: @q),
+            class: "px-3 py-1.5 bg-[#21262d] border border-[#30363d] rounded text-sm text-white hover:bg-[#30363d] transition-colors" %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,29 @@
+<%# Partial for a single button row in the template builder %>
+<div class="flex gap-2 items-center" data-template-builder-target="buttonRow">
+  <input type="text"
+         name="marketing_template[buttons][<%= index %>][label]"
+         value="<%= btn["label"] || btn[:label] %>"
+         placeholder="Texto do botão"
+         class="flex-1 bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-3 py-2 text-sm outline-none border border-transparent focus:border-[#00a884]">
+
+  <select name="marketing_template[buttons][<%= index %>][type]"
+          class="bg-[#2a3942] text-[#d1d7db] rounded-lg px-2 py-2 text-xs outline-none border border-transparent focus:border-[#00a884]">
+    <option value="quick_reply" <%= "selected" if (btn["type"] || btn[:type]).to_s == "quick_reply" %>>Resposta</option>
+    <option value="url"         <%= "selected" if (btn["type"] || btn[:type]).to_s == "url" %>>URL</option>
+    <option value="phone"       <%= "selected" if (btn["type"] || btn[:type]).to_s == "phone" %>>Telefone</option>
+  </select>
+
+  <input type="text"
+         name="marketing_template[buttons][<%= index %>][value]"
+         value="<%= btn["value"] || btn[:value] %>"
+         placeholder="Valor (URL ou tel)"
+         class="flex-1 bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-3 py-2 text-sm outline-none border border-transparent focus:border-[#00a884]">
+
+  <button type="button"
+          data-action="click->template-builder#removeButton"
+          class="text-[#8696a0] hover:text-red-400 p-1 transition-colors flex-shrink-0">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+</div>

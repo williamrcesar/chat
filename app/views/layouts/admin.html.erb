@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Admin — <%= content_for(:title) || "Dashboard" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="bg-[#0d1117] text-white min-h-screen">
+
+    <%# Top nav %>
+    <nav class="bg-[#161b22] border-b border-[#30363d] px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <%= link_to admin_root_path, class: "flex items-center gap-2 font-semibold text-white" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00a884]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          Chat Admin
+        <% end %>
+        <%= link_to "Dashboard", admin_root_path,
+              class: "text-sm #{current_page?(admin_root_path) ? 'text-white font-medium' : 'text-[#8b949e] hover:text-white'} transition-colors" %>
+        <%= link_to "Usuários", admin_users_path,
+              class: "text-sm #{request.path.start_with?('/admin/users') ? 'text-white font-medium' : 'text-[#8b949e] hover:text-white'} transition-colors" %>
+        <%= link_to "Conversas", admin_conversations_path,
+              class: "text-sm #{request.path.start_with?('/admin/conversations') ? 'text-white font-medium' : 'text-[#8b949e] hover:text-white'} transition-colors" %>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <%= link_to root_path, class: "text-[#8b949e] hover:text-white text-sm transition-colors" do %>
+          ← Voltar ao app
+        <% end %>
+        <%= link_to destroy_user_session_path, data: { turbo_method: :delete },
+              class: "text-[#8b949e] hover:text-red-400 text-sm transition-colors" do %>
+          Sair
+        <% end %>
+      </div>
+    </nav>
+
+    <%# Flash messages %>
+    <% if notice %>
+      <div class="bg-[#1f6feb]/20 border-b border-[#1f6feb]/50 text-[#58a6ff] text-sm px-6 py-2"><%= notice %></div>
+    <% end %>
+    <% if alert %>
+      <div class="bg-red-900/20 border-b border-red-500/50 text-red-400 text-sm px-6 py-2"><%= alert %></div>
+    <% end %>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+      <%= yield %>
+    </main>
+  </body>
+</html>

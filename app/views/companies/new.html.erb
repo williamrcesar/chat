@@ -1,0 +1,62 @@
+<% content_for :title, "Criar Empresa" %>
+
+<div class="flex items-center justify-center min-h-screen bg-[#111b21]">
+  <div class="w-full max-w-lg">
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 bg-[#00a884] rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      </div>
+      <h1 class="text-white text-2xl font-light">Criar Conta Empresa</h1>
+      <p class="text-[#8696a0] text-sm mt-1">Configure seu inbox de atendimento</p>
+    </div>
+
+    <div class="bg-[#202c33] rounded-2xl p-8 shadow-2xl">
+      <%= form_with model: @company, url: companies_path, multipart: true, class: "space-y-4" do |f| %>
+        <% if @company.errors.any? %>
+          <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+            <% @company.errors.full_messages.each do |msg| %>
+              <p class="text-red-400 text-sm"><%= msg %></p>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Nome da empresa *</label>
+          <%= f.text_field :name, placeholder: "Ex: Acme Suporte",
+                class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+        </div>
+
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Nickname da empresa *</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[#8696a0] text-sm">@</span>
+            <%= f.text_field :nickname, placeholder: "acmesuporte",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg pl-8 pr-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+          </div>
+          <p class="text-[#8696a0] text-xs mt-1">Clientes buscarão sua empresa por esse @nickname</p>
+        </div>
+
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Descrição</label>
+          <%= f.text_area :description, rows: 3, placeholder: "Breve descrição da sua empresa...",
+                class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] resize-none" %>
+        </div>
+
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Logo (opcional)</label>
+          <%= f.file_field :logo, accept: "image/*",
+                class: "text-[#8696a0] text-sm" %>
+        </div>
+
+        <%= f.submit "Criar Empresa",
+              class: "w-full bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer mt-2" %>
+      <% end %>
+
+      <div class="mt-4 text-center">
+        <%= link_to "Voltar ao Chat", root_path, class: "text-[#8696a0] hover:text-white text-sm transition-colors" %>
+      </div>
+    </div>
+  </div>
+</div>

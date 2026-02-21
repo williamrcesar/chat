@@ -1,0 +1,63 @@
+<div class="conversation-item flex items-center gap-3 px-4 py-3 hover:bg-[#2a3942] cursor-pointer border-b border-[#2a3942]/30 transition-colors"
+     data-name="<%= conversation.display_name_for(current_user).downcase %>"
+     data-conversation-id="<%= conversation.id %>">
+  <%= link_to conversation_path(conversation), class: "flex items-center gap-3 w-full", "data-turbo-frame": "_top" do %>
+    <%# Avatar %>
+    <div class="flex-shrink-0">
+      <% if conversation.avatar.attached? %>
+        <%= image_tag conversation.avatar, class: "w-12 h-12 rounded-full object-cover" %>
+      <% elsif conversation.conversation_type_group? %>
+        <div class="w-12 h-12 rounded-full bg-[#6a7175] flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5M12 12a4 4 0 100-8 4 4 0 000 8z" />
+          </svg>
+        </div>
+      <% else %>
+        <% other = conversation.other_user(current_user) %>
+        <div class="w-12 h-12 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold">
+          <%= other&.display_name&.first&.upcase || "?" %>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Info %>
+      <div class="flex-1 min-w-0">
+      <div class="flex justify-between items-baseline">
+        <span class="text-white text-sm font-medium truncate flex items-center gap-1">
+          <% participant = conversation.participants.find_by(user_id: current_user.id) %>
+          <% if participant&.pinned? %>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#8696a0] flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+            </svg>
+          <% end %>
+          <%= conversation.display_name_for(current_user) %>
+        </span>
+        <% if (last = conversation.last_message) %>
+          <span class="text-[#8696a0] text-xs ml-2 flex-shrink-0">
+            <%= last.created_at.strftime("%H:%M") %>
+          </span>
+        <% end %>
+      </div>
+      <div class="flex items-center justify-between mt-0.5">
+        <span class="text-[#8696a0] text-xs truncate">
+          <% if (last = conversation.last_message) %>
+            <% if last.sender == current_user %>
+              <svg xmlns="http://www.w3.org/2000/svg" class="inline h-3 w-3 text-[#53bdeb] mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+              </svg>
+            <% end %>
+            <%= last.type_image? ? "📷 Foto" : last.type_audio? ? "🎤 Áudio" : last.type_video? ? "🎥 Vídeo" : last.type_document? ? "📄 Documento" : last.content&.truncate(40) %>
+          <% else %>
+            Nenhuma mensagem
+          <% end %>
+        </span>
+        <% unread = conversation.unread_count_for(current_user) %>
+        <% if unread > 0 %>
+          <span class="bg-[#00a884] text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center px-1 ml-1 flex-shrink-0">
+            <%= unread %>
+          </span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

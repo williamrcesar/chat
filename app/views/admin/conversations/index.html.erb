@@ -1,0 +1,62 @@
+<% content_for :title, "Conversas" %>
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-white">Conversas</h1>
+  <span class="text-[#8b949e] text-sm"><%= @pagy.count %> total</span>
+</div>
+
+<div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-[#30363d] bg-[#21262d]">
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">ID</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Nome</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Tipo</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Participantes</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Mensagens</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Última atividade</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Ações</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-[#21262d]">
+      <% @conversations.each do |convo| %>
+        <tr class="hover:bg-[#21262d] transition-colors">
+          <td class="px-4 py-3 text-[#8b949e] text-xs">#<%= convo.id %></td>
+          <td class="px-4 py-3 text-white"><%= convo.name || "(direto)" %></td>
+          <td class="px-4 py-3">
+            <span class="text-xs px-2 py-0.5 rounded-full <%= convo.conversation_type_group? ? 'bg-blue-500/10 text-blue-400' : 'bg-[#30363d] text-[#8b949e]' %>">
+              <%= convo.conversation_type %>
+            </span>
+          </td>
+          <td class="px-4 py-3 text-[#8b949e]"><%= convo.participants.size %></td>
+          <td class="px-4 py-3 text-[#8b949e]"><%= convo.messages.count %></td>
+          <td class="px-4 py-3 text-[#8b949e] text-xs"><%= convo.updated_at.strftime("%d/%m %H:%M") %></td>
+          <td class="px-4 py-3">
+            <div class="flex gap-2">
+              <%= link_to "Ver", admin_conversation_path(convo), class: "text-[#58a6ff] text-xs hover:underline" %>
+              <%= button_to admin_conversation_path(convo), method: :delete,
+                    data: { turbo_confirm: "Remover esta conversa e todas as mensagens?" },
+                    class: "text-xs text-red-400 hover:text-red-300 transition-colors" do %>
+                Remover
+              <% end %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<% if @pagy.pages > 1 %>
+  <div class="flex items-center justify-center gap-2 mt-6">
+    <% if @pagy.prev %>
+      <%= link_to "← Anterior", admin_conversations_path(page: @pagy.prev),
+            class: "px-3 py-1.5 bg-[#21262d] border border-[#30363d] rounded text-sm text-white hover:bg-[#30363d]" %>
+    <% end %>
+    <span class="text-[#8b949e] text-sm">Página <%= @pagy.page %> de <%= @pagy.pages %></span>
+    <% if @pagy.next %>
+      <%= link_to "Próxima →", admin_conversations_path(page: @pagy.next),
+            class: "px-3 py-1.5 bg-[#21262d] border border-[#30363d] rounded text-sm text-white hover:bg-[#30363d]" %>
+    <% end %>
+  </div>
+<% end %>

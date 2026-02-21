@@ -1,0 +1,86 @@
+<%# Global WebRTC call UI — injected into the main layout %>
+<div data-controller="call"
+     data-call-target="wrapper"
+     id="call-wrapper">
+
+  <%# ── Incoming call modal ── %>
+  <div data-call-target="incomingModal"
+       class="hidden fixed inset-0 bg-black/70 z-50 flex items-end justify-center pb-12">
+    <div class="bg-[#1f2c34] rounded-2xl p-8 w-80 text-center shadow-2xl border border-[#2a3942]">
+      <div class="w-16 h-16 rounded-full bg-[#00a884] flex items-center justify-center mx-auto mb-4 animate-pulse">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        </svg>
+      </div>
+      <p class="text-[#8696a0] text-sm mb-1" data-call-target="callTypeLabel">📹 Chamada de vídeo</p>
+      <h3 class="text-white text-xl font-semibold mb-6" data-call-target="callerName">Alguém</h3>
+      <div class="flex gap-4 justify-center">
+        <button data-action="click->call#rejectCall"
+                class="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+          </svg>
+        </button>
+        <button data-action="click->call#acceptCall"
+                class="w-14 h-14 rounded-full bg-[#00a884] hover:bg-[#02966f] flex items-center justify-center transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Active call UI ── %>
+  <div data-call-target="activeModal"
+       class="hidden fixed inset-0 bg-black z-50 flex flex-col">
+
+    <%# Remote video (full screen) %>
+    <video data-call-target="remoteVideo"
+           autoplay playsinline
+           class="flex-1 w-full object-cover bg-[#111b21]"></video>
+
+    <%# Local video (picture-in-picture) %>
+    <video data-call-target="localVideo"
+           autoplay playsinline muted
+           class="absolute top-4 right-4 w-32 h-24 rounded-xl object-cover border-2 border-[#2a3942] shadow-lg bg-[#202c33]"></video>
+
+    <%# Status bar %>
+    <div class="absolute top-4 left-4 bg-black/40 backdrop-blur px-3 py-1.5 rounded-full">
+      <p class="text-white text-sm" data-call-target="statusLabel">Conectando...</p>
+    </div>
+
+    <%# Controls bar %>
+    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pb-10 pt-16">
+      <div class="flex items-center justify-center gap-6">
+
+        <%# Mute %>
+        <button data-action="click->call#toggleMute"
+                data-call-target="muteBtn"
+                class="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center transition-colors gap-0.5">
+          <span class="text-xl">🎤</span>
+          <span class="text-white text-[10px]">Mudo</span>
+        </button>
+
+        <%# Video toggle %>
+        <button data-action="click->call#toggleVideo"
+                data-call-target="videoBtn"
+                class="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center transition-colors gap-0.5">
+          <span class="text-xl">📵</span>
+          <span class="text-white text-[10px]">Câmera</span>
+        </button>
+
+        <%# End call %>
+        <button data-action="click->call#endCall"
+                class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex flex-col items-center justify-center transition-colors gap-0.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+          </svg>
+          <span class="text-white text-[10px]">Encerrar</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+</div>

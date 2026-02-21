@@ -1,0 +1,131 @@
+<% content_for :title, @campaign.name %>
+
+<div class="flex items-center gap-4 mb-6">
+  <%= link_to marketing_campaigns_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  <% end %>
+
+  <div class="flex-1">
+    <div class="flex items-center gap-3">
+      <h1 class="text-xl font-semibold text-white"><%= @campaign.name %></h1>
+      <% badge_class = case @campaign.status
+         when "running"   then "bg-green-500/20 text-green-400"
+         when "paused"    then "bg-yellow-500/20 text-yellow-400"
+         when "completed" then "bg-blue-500/20 text-blue-400"
+         else                  "bg-[#2a3942] text-[#8696a0]"
+         end %>
+      <span class="<%= badge_class %> text-xs px-2.5 py-1 rounded-full font-semibold capitalize">
+        <%= @campaign.status %>
+      </span>
+    </div>
+    <p class="text-[#8696a0] text-sm">
+      Template: <span class="text-[#d1d7db]"><%= @campaign.marketing_template.name %></span> ·
+      <%= @campaign.recipient_identifiers.size %> destinatários
+    </p>
+  </div>
+
+  <div class="flex gap-2">
+    <% if @campaign.status_draft? || @campaign.status_paused? %>
+      <%= button_to launch_marketing_campaign_path(@campaign), method: :post,
+            class: "bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors" do %>
+        ▶ Iniciar Envio
+      <% end %>
+    <% end %>
+    <% if @campaign.status_running? %>
+      <%= button_to pause_marketing_campaign_path(@campaign), method: :post,
+            class: "bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors" do %>
+        ⏸ Pausar
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<%# Stats bar %>
+<div class="grid grid-cols-6 gap-3 mb-6">
+  <% [
+    ["Fila",        @campaign.queued_count,    "text-[#8696a0]",  "bg-[#2a3942]"],
+    ["Enviado",     @campaign.sent_count,      "text-[#d1d7db]",  "bg-[#3b4a54]"],
+    ["Entregue",    @campaign.delivered_count, "text-[#00a884]",  "bg-[#00a884]/10"],
+    ["Lido",        @campaign.read_count,      "text-[#34b7f1]",  "bg-[#34b7f1]/10"],
+    ["Clicou",      @campaign.clicked_count,   "text-[#25d366]",  "bg-[#25d366]/10"],
+    ["Falhou",      @campaign.failed_count,    "text-red-400",    "bg-red-500/10"]
+  ].each do |label, count, text_class, bg_class| %>
+    <div class="<%= bg_class %> rounded-xl p-4 text-center">
+      <p class="text-2xl font-bold <%= text_class %>"><%= count %></p>
+      <p class="text-[#8696a0] text-xs mt-1"><%= label %></p>
+    </div>
+  <% end %>
+</div>
+
+<%# Kanban board %>
+<div class="overflow-x-auto pb-4"
+     data-controller="kanban"
+     data-kanban-campaign-id-value="<%= @campaign.id %>">
+
+  <div class="flex gap-4 min-w-max">
+    <% KANBAN_COLUMNS = [
+      { key: "queued",    label: "Fila",      color: "border-[#8696a0]",  header: "bg-[#2a3942]" },
+      { key: "sent",      label: "Enviado",   color: "border-[#3b4a54]",  header: "bg-[#3b4a54]" },
+      { key: "delivered", label: "Entregue",  color: "border-[#00a884]/40", header: "bg-[#00a884]/20" },
+      { key: "read",      label: "Lido",      color: "border-[#34b7f1]/40", header: "bg-[#34b7f1]/20" },
+      { key: "clicked",   label: "Clicou",    color: "border-[#25d366]/40", header: "bg-[#25d366]/20" },
+      { key: "failed",    label: "Falhou",    color: "border-red-500/40",   header: "bg-red-500/20" }
+    ] %>
+
+    <% KANBAN_COLUMNS.each do |col| %>
+      <% deliveries = @deliveries_by_status[col[:key]] || [] %>
+      <div class="w-64 flex-shrink-0 flex flex-col rounded-xl border <%= col[:color] %> overflow-hidden"
+           data-kanban-target="column"
+           data-column="<%= col[:key] %>">
+
+        <%# Column header %>
+        <div class="<%= col[:header] %> px-4 py-3 flex items-center justify-between">
+          <span class="text-white text-sm font-semibold"><%= col[:label] %></span>
+          <span class="bg-black/20 text-white text-xs px-2 py-0.5 rounded-full"
+                data-kanban-target="count"
+                data-column="<%= col[:key] %>">
+            <%= deliveries.size %>
+          </span>
+        </div>
+
+        <%# Cards %>
+        <div class="flex-1 overflow-y-auto max-h-[60vh] bg-[#1a242a] p-2 space-y-2"
+             data-kanban-target="cards"
+             data-column="<%= col[:key] %>">
+          <% deliveries.each do |delivery| %>
+            <div class="bg-[#202c33] rounded-lg p-3 shadow"
+                 id="delivery-<%= delivery.id %>"
+                 data-kanban-target="card"
+                 data-delivery-id="<%= delivery.id %>">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
+                  <%= delivery.recipient_user.display_name.first.upcase %>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-white text-xs font-semibold truncate"><%= delivery.recipient_user.display_name %></p>
+                  <% if delivery.recipient_user.nickname.present? %>
+                    <p class="text-[#8696a0] text-xs">@<%= delivery.recipient_user.nickname %></p>
+                  <% end %>
+                </div>
+              </div>
+              <% if delivery.clicked_button_label.present? %>
+                <div class="mt-2 bg-[#25d366]/10 rounded px-2 py-1">
+                  <p class="text-[#25d366] text-xs">Clicou: "<%= delivery.clicked_button_label %>"</p>
+                </div>
+              <% elsif delivery.clicked_list_row_id.present? %>
+                <div class="mt-2 bg-[#25d366]/10 rounded px-2 py-1">
+                  <p class="text-[#25d366] text-xs">Lista: "<%= delivery.clicked_list_row_id %>"</p>
+                </div>
+              <% end %>
+              <% if delivery.clicked_at %>
+                <p class="text-[#8696a0] text-xs mt-1"><%= delivery.clicked_at.strftime("%d/%m %H:%M") %></p>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

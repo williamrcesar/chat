@@ -1,0 +1,58 @@
+<% content_for :title, "Editar Perfil" %>
+
+<div class="flex h-screen bg-[#111b21]">
+  <div class="w-full max-w-2xl mx-auto p-6">
+
+    <div class="flex items-center gap-4 mb-8">
+      <%= link_to profile_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      <% end %>
+      <h1 class="text-white text-xl font-medium">Editar Perfil</h1>
+    </div>
+
+    <div class="bg-[#202c33] rounded-2xl p-8">
+      <%= form_with model: @user, url: profile_path, method: :patch, class: "space-y-6" do |f| %>
+
+        <div class="flex flex-col items-center mb-6">
+          <% if @user.avatar.attached? %>
+            <%= image_tag @user.avatar, class: "w-24 h-24 rounded-full object-cover mb-3" %>
+          <% else %>
+            <div class="w-24 h-24 rounded-full bg-[#6a7175] flex items-center justify-center text-white text-3xl font-semibold mb-3">
+              <%= @user.display_name.first.upcase %>
+            </div>
+          <% end %>
+          <label class="text-[#00a884] text-sm cursor-pointer hover:underline">
+            Alterar foto
+            <%= f.file_field :avatar, accept: "image/*", class: "hidden" %>
+          </label>
+        </div>
+
+        <div>
+          <%= f.label :display_name, "Nome de exibição", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+          <%= f.text_field :display_name,
+                class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+        </div>
+
+        <div>
+          <%= f.label :phone, "Telefone", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+          <%= f.telephone_field :phone,
+                placeholder: "+55 11 99999-9999",
+                class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+        </div>
+
+        <div>
+          <%= f.label :bio, "Sobre", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+          <%= f.text_area :bio,
+                rows: 3,
+                placeholder: "Conte um pouco sobre você...",
+                class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors resize-none" %>
+        </div>
+
+        <%= f.submit "Salvar",
+              class: "w-full bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
+      <% end %>
+    </div>
+  </div>
+</div>

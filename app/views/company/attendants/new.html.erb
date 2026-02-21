@@ -1,0 +1,86 @@
+<% content_for :title, "Novo Atendente" %>
+
+<div class="max-w-lg mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-white">Adicionar Atendente</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Adicione um usuário à equipe de atendimento</p>
+  </div>
+
+  <div class="bg-[#202c33] rounded-xl p-6">
+    <%= form_with model: [:company, @attendant], class: "space-y-5" do |f| %>
+      <% if @attendant.errors.any? %>
+        <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+          <% @attendant.errors.full_messages.each do |msg| %>
+            <p class="text-red-400 text-sm"><%= msg %></p>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div>
+        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">
+          @Nickname ou Email do usuário *
+        </label>
+        <input type="text" name="company_attendant[user_identifier]"
+               placeholder="@alice ou alice@email.com"
+               class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+        <p class="text-[#8696a0] text-xs mt-1">O usuário precisa ter uma conta no sistema.</p>
+      </div>
+
+      <div>
+        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Departamento / Função *</label>
+        <%= f.text_field :role_name, placeholder: "Ex: Financeiro, Suporte, TI, IA",
+              class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+        <p class="text-[#8696a0] text-xs mt-1">Deve coincidir com o role_name do departamento no menu.</p>
+      </div>
+
+      <div>
+        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Tipo</label>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <%= f.radio_button :attendant_type, "human", checked: true, class: "accent-[#00a884]" %>
+            <span class="text-[#d1d7db] text-sm">Humano</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <%= f.radio_button :attendant_type, "ai", class: "accent-[#00a884]" %>
+            <span class="text-[#d1d7db] text-sm">Atendente IA</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">
+          Tags (separadas por vírgula)
+        </label>
+        <input type="text" id="tags-input" placeholder="vip, técnico, nível2"
+               class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]"
+               data-controller="tag-input">
+        <div id="tags-hidden"></div>
+        <script>
+          document.getElementById("tags-input").addEventListener("change", function() {
+            const container = document.getElementById("tags-hidden");
+            container.innerHTML = "";
+            this.value.split(",").map(s => s.trim()).filter(s => s).forEach(function(tag) {
+              const input = document.createElement("input");
+              input.type = "hidden";
+              input.name = "company_attendant[tags][]";
+              input.value = tag;
+              container.appendChild(input);
+            });
+          });
+        </script>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <%= f.check_box :is_supervisor, class: "accent-[#00a884] w-4 h-4" %>
+        <label class="text-[#d1d7db] text-sm">Este atendente é supervisor (pode gerenciar a empresa)</label>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <%= f.submit "Adicionar Atendente",
+              class: "flex-1 bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
+        <%= link_to "Cancelar", company_attendants_path,
+              class: "px-5 py-3 text-[#8696a0] hover:text-white text-sm font-semibold rounded-lg border border-[#2a3942] transition-colors" %>
+      </div>
+    <% end %>
+  </div>
+</div>

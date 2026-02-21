@@ -1,0 +1,85 @@
+<div class="flex items-center justify-center min-h-screen bg-[#111b21]">
+  <div class="w-full max-w-md">
+
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 bg-[#00a884] rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      </div>
+      <h1 class="text-white text-2xl font-light">Criar Conta</h1>
+      <p class="text-[#8696a0] text-sm mt-1">Crie sua conta para começar</p>
+    </div>
+
+    <div class="bg-[#202c33] rounded-2xl p-8 shadow-2xl">
+      <%= form_for(resource, as: resource_name, url: registration_path(resource_name)) do |f| %>
+        <% if resource.errors.any? %>
+          <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4">
+            <% resource.errors.full_messages.each do |msg| %>
+              <p class="text-red-400 text-xs"><%= msg %></p>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="space-y-4">
+          <div>
+            <%= f.label :display_name, "Nome de exibição", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <%= f.text_field :display_name,
+                  placeholder: "Seu nome",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+          </div>
+
+          <div>
+            <%= f.label :nickname, "Nickname único", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[#8696a0] text-sm">@</span>
+              <%= f.text_field :nickname,
+                    placeholder: "seunick",
+                    class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg pl-8 pr-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+            </div>
+            <p class="text-[#8696a0] text-xs mt-1">Letras minúsculas, números e underscores. 3-30 caracteres.</p>
+          </div>
+
+          <div>
+            <%= f.label :email, "Email", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <%= f.email_field :email,
+                  autofocus: true,
+                  autocomplete: "email",
+                  placeholder: "seu@email.com",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+          </div>
+
+          <div>
+            <%= f.label :phone, "Telefone (opcional)", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <%= f.telephone_field :phone,
+                  placeholder: "+55 11 99999-9999",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+          </div>
+
+          <div>
+            <%= f.label :password, "Senha", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <%= f.password_field :password,
+                  autocomplete: "new-password",
+                  placeholder: "Mínimo 6 caracteres",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+          </div>
+
+          <div>
+            <%= f.label :password_confirmation, "Confirmar senha", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
+            <%= f.password_field :password_confirmation,
+                  autocomplete: "new-password",
+                  placeholder: "Repita a senha",
+                  class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
+          </div>
+
+          <%= f.submit "Criar Conta",
+                class: "w-full bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer mt-2" %>
+        </div>
+      <% end %>
+
+      <div class="mt-6 text-center space-y-2">
+        <%= render "devise/shared/links" %>
+      </div>
+    </div>
+  </div>
+</div>

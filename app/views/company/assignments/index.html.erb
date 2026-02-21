@@ -1,0 +1,77 @@
+<% content_for :title, "Atendimentos" %>
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-white">Atendimentos</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Histórico e atendimentos em andamento</p>
+  </div>
+
+  <%# Filters %>
+  <div class="flex gap-2">
+    <% [["", "Todos"], ["pending", "Aguardando"], ["active", "Ativo"], ["resolved", "Resolvido"]].each do |status, label| %>
+      <%= link_to company_assignments_path(status: status.presence),
+            class: "text-xs px-3 py-1.5 rounded-full border transition-colors #{params[:status].to_s == status.to_s ? 'border-[#00a884] text-[#00a884] bg-[#00a884]/10' : 'border-[#2a3942] text-[#8696a0] hover:text-white'}" do %>
+        <%= label %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<% if @assignments.empty? %>
+  <div class="text-center py-20 text-[#8696a0]">
+    <p>Nenhum atendimento encontrado.</p>
+  </div>
+<% else %>
+  <div class="bg-[#202c33] rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-[#2a3942] text-[#8696a0] text-xs uppercase">
+          <th class="px-4 py-3 text-left">Cliente</th>
+          <th class="px-4 py-3 text-left">Departamento</th>
+          <th class="px-4 py-3 text-left">Atendente</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Início</th>
+          <th class="px-4 py-3 text-left">Ações</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-[#2a3942]">
+        <% @assignments.each do |assignment| %>
+          <% customer = assignment.conversation.users
+               .where.not(id: assignment.company.owner_id)
+               .first %>
+          <tr class="hover:bg-[#2a3942]/40 transition-colors">
+            <td class="px-4 py-3">
+              <p class="text-white text-sm font-medium"><%= customer&.display_name || "—" %></p>
+              <% if customer&.nickname.present? %>
+                <p class="text-[#8696a0] text-xs">@<%= customer.nickname %></p>
+              <% end %>
+            </td>
+            <td class="px-4 py-3 text-[#d1d7db] text-sm">
+              <%= assignment.selected_department.presence || "—" %>
+            </td>
+            <td class="px-4 py-3 text-[#d1d7db] text-sm">
+              <%= assignment.company_attendant&.user&.display_name || "—" %>
+            </td>
+            <td class="px-4 py-3">
+              <% badge = {
+                "pending"     => ["bg-yellow-500/20 text-yellow-400", "Aguardando"],
+                "queued"      => ["bg-blue-500/20 text-blue-400", "Na Fila"],
+                "active"      => ["bg-[#00a884]/20 text-[#00a884]", "Em Atendimento"],
+                "transferred" => ["bg-purple-500/20 text-purple-400", "Transferido"],
+                "resolved"    => ["bg-[#8696a0]/20 text-[#8696a0]", "Resolvido"]
+              }[assignment.status] || ["", assignment.status] %>
+              <span class="<%= badge[0] %> text-xs px-2 py-0.5 rounded-full"><%= badge[1] %></span>
+            </td>
+            <td class="px-4 py-3 text-[#8696a0] text-xs">
+              <%= assignment.created_at.strftime("%d/%m %H:%M") %>
+            </td>
+            <td class="px-4 py-3">
+              <%= link_to "Ver", company_assignment_path(assignment),
+                    class: "text-[#00a884] hover:underline text-xs" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

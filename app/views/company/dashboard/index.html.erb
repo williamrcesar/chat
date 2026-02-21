@@ -1,0 +1,85 @@
+<% content_for :title, "Dashboard — #{@current_company.name}" %>
+
+<div data-controller="company-inbox"
+     data-company-inbox-company-id-value="<%= @current_company.id %>">
+
+  <%# Header %>
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-white">Dashboard de Atendimento</h1>
+      <p class="text-[#8696a0] text-sm mt-1">
+        <%= @pending_count %> aguardando · <%= @queued_count %> na fila · <%= @active_count %> em atendimento · <%= @resolved_count %> resolvidos
+      </p>
+    </div>
+    <%= link_to new_company_attendant_path,
+          class: "bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2" do %>
+      + Adicionar Atendente
+    <% end %>
+  </div>
+
+  <%# Attendant Status Board %>
+  <div class="bg-[#202c33] rounded-xl p-4 mb-6">
+    <h3 class="text-white text-sm font-semibold mb-3">Status dos Atendentes</h3>
+    <div class="flex flex-wrap gap-2" data-company-inbox-target="attendantBoard">
+      <% @attendants.each do |attendant| %>
+        <div class="flex items-center gap-2 bg-[#2a3942] rounded-lg px-3 py-2"
+             id="attendant-status-<%= attendant.id %>"
+             data-company-inbox-target="attendantCard">
+          <div class="w-2 h-2 rounded-full <%= attendant.status_available? ? 'bg-[#25d366]' : attendant.status_busy? ? 'bg-yellow-400' : 'bg-[#8696a0]' %>"></div>
+          <span class="text-white text-xs font-medium"><%= attendant.user.display_name %></span>
+          <span class="text-[#8696a0] text-xs"><%= attendant.role_name %></span>
+          <% if attendant.is_supervisor? %>
+            <span class="bg-[#00a884]/20 text-[#00a884] text-xs px-1.5 py-0.5 rounded">Sup</span>
+          <% end %>
+          <% if attendant.user_id == current_user.id %>
+            <select data-action="change->company-inbox#updateMyStatus"
+                    data-attendant-id="<%= attendant.id %>"
+                    class="bg-[#1f2c34] text-[#d1d7db] text-xs rounded px-1 py-0.5 outline-none border border-[#3b4a54]">
+              <% CompanyAttendant.statuses.each_key do |s| %>
+                <option value="<%= s %>" <%= "selected" if attendant.status == s %>>
+                  <%= { "available" => "Disponível", "busy" => "Ocupado", "offline" => "Offline" }[s] %>
+                </option>
+              <% end %>
+            </select>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Live Inbox Kanban %>
+  <div class="overflow-x-auto pb-4">
+    <div class="flex gap-4 min-w-max">
+      <% [
+        { key: "pending",   label: "Aguardando", color: "border-yellow-500/40", header: "bg-yellow-500/20", text: "text-yellow-400" },
+        { key: "queued",    label: "Na Fila",     color: "border-[#34b7f1]/40",  header: "bg-[#34b7f1]/20", text: "text-[#34b7f1]" },
+        { key: "active",    label: "Em Atendimento", color: "border-[#00a884]/40", header: "bg-[#00a884]/20", text: "text-[#00a884]" },
+        { key: "transferred",label: "Transferido", color: "border-purple-500/40", header: "bg-purple-500/20", text: "text-purple-400" },
+        { key: "resolved",  label: "Resolvido",   color: "border-[#8696a0]/40",  header: "bg-[#2a3942]",    text: "text-[#8696a0]" }
+      ].each do |col| %>
+        <% assignments = @assignments_by_status[col[:key]] || [] %>
+        <div class="w-72 flex-shrink-0 flex flex-col rounded-xl border <%= col[:color] %> overflow-hidden"
+             data-company-inbox-target="column"
+             data-column="<%= col[:key] %>">
+
+          <div class="<%= col[:header] %> px-4 py-3 flex items-center justify-between">
+            <span class="text-white text-sm font-semibold"><%= col[:label] %></span>
+            <span class="bg-black/20 text-white text-xs px-2 py-0.5 rounded-full"
+                  data-company-inbox-target="count"
+                  data-column="<%= col[:key] %>">
+              <%= assignments.size %>
+            </span>
+          </div>
+
+          <div class="flex-1 overflow-y-auto max-h-[60vh] bg-[#1a242a] p-2 space-y-2"
+               data-company-inbox-target="cards"
+               data-column="<%= col[:key] %>">
+            <% assignments.each do |assignment| %>
+              <%= render "company/dashboard/assignment_card", assignment: assignment %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,60 @@
+<%# WhatsApp-style message bubble preview %>
+<div class="bg-[#202c33] rounded-2xl rounded-tl-sm p-3 shadow-lg max-w-[280px] space-y-1.5"
+     data-template-builder-target="previewBubble">
+
+  <%# Header %>
+  <% if template.header_type == "image" %>
+    <div class="bg-[#2a3942] rounded-lg h-32 flex items-center justify-center">
+      <% if template.persisted? && template.header_image.attached? %>
+        <%= image_tag template.header_image, class: "h-32 w-full object-cover rounded-lg" %>
+      <% else %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      <% end %>
+    </div>
+  <% elsif template.header_type == "text" && template.header_text.present? %>
+    <p class="text-white font-bold text-sm" data-template-builder-target="previewHeader">
+      <%= template.header_text %>
+    </p>
+  <% end %>
+
+  <%# Body %>
+  <p class="text-[#d1d7db] text-sm leading-relaxed" data-template-builder-target="previewBody">
+    <%= template.body.presence || "Corpo da mensagem..." %>
+  </p>
+
+  <%# Footer %>
+  <% if template.footer.present? %>
+    <p class="text-[#8696a0] text-xs italic" data-template-builder-target="previewFooter">
+      <%= template.footer %>
+    </p>
+  <% end %>
+
+  <p class="text-[#8696a0] text-xs text-right">agora ✓</p>
+
+  <%# Buttons %>
+  <% if template.buttons.any? %>
+    <div class="border-t border-[#2a3942] pt-2 space-y-1.5">
+      <% template.buttons.each do |btn| %>
+        <button type="button"
+                class="w-full text-[#00a884] text-sm font-semibold py-1.5 rounded-lg border border-[#00a884]/30 hover:bg-[#00a884]/10 transition-colors">
+          <%= btn["label"] || btn[:label] %>
+        </button>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# List %>
+  <% if template.list_sections.any? %>
+    <div class="border-t border-[#2a3942] pt-2">
+      <button type="button"
+              class="w-full text-[#00a884] text-sm font-semibold py-1.5 rounded-lg border border-[#00a884]/30 hover:bg-[#00a884]/10 transition-colors flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+        </svg>
+        <%= template.list_header&.dig("text") || template.list_header&.dig(:text) || "Ver opções" %>
+      </button>
+    </div>
+  <% end %>
+</div>

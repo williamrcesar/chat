@@ -1,0 +1,270 @@
+<% content_for :title, @conversation.display_name_for(current_user) %>
+
+<div class="flex h-screen bg-[#111b21]"
+     data-controller="chat"
+     data-chat-conversation-id-value="<%= @conversation.id %>"
+     data-chat-interactive-locked-value="<%= @participant&.interactively_locked? %>">
+
+  <%# SIDEBAR (reloaded with current conversation highlighted) %>
+  <div class="w-[400px] min-w-[400px] flex flex-col border-r border-[#2a3942] bg-[#111b21]">
+
+    <%# Sidebar Header %>
+    <div class="flex items-center justify-between px-4 py-3 bg-[#202c33]">
+      <%= link_to profile_path, class: "flex items-center gap-3" do %>
+        <% if current_user.avatar.attached? %>
+          <%= image_tag current_user.avatar, class: "w-10 h-10 rounded-full object-cover" %>
+        <% else %>
+          <div class="w-10 h-10 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold text-sm">
+            <%= current_user.display_name.first.upcase %>
+          </div>
+        <% end %>
+      <% end %>
+
+      <div class="flex items-center gap-2 ml-auto">
+        <%= link_to templates_path, class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10" />
+          </svg>
+        <% end %>
+        <% if current_user.role_admin? %>
+          <%= link_to admin_root_path, class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors", title: "Admin" do %>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00a884]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          <% end %>
+        <% end %>
+        <%= link_to destroy_user_session_path, data: { turbo_method: :delete },
+              class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+          </svg>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Search %>
+    <div class="px-3 py-2 bg-[#111b21]">
+      <div class="flex items-center bg-[#202c33] rounded-lg px-4 py-2 gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+        </svg>
+        <input type="text" placeholder="Pesquisar conversas"
+               class="bg-transparent text-[#d1d7db] placeholder-[#8696a0] text-sm outline-none w-full"
+               data-action="input->conversation-search#filter">
+      </div>
+    </div>
+
+    <%# Conversations list %>
+    <div class="flex-1 overflow-y-auto" data-controller="conversation-search">
+      <% current_user.conversations.includes(:users, :messages).recent.each do |convo| %>
+        <div class="<%= 'bg-[#2a3942]' if convo.id == @conversation.id %>">
+          <%= render "conversations/conversation_item", conversation: convo, current_user: current_user %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# MAIN CHAT PANEL %>
+  <div class="flex-1 flex flex-col bg-[#0b141a] relative">
+
+    <%# Chat header %>
+    <div class="flex items-center gap-3 px-4 py-3 bg-[#202c33] border-b border-[#2a3942] relative">
+      <%= link_to root_path, class: "md:hidden p-1 mr-1" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      <% end %>
+
+      <% if @conversation.conversation_type_group? %>
+        <div class="w-10 h-10 rounded-full bg-[#6a7175] flex items-center justify-center flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5M12 12a4 4 0 100-8 4 4 0 000 8z" />
+          </svg>
+        </div>
+      <% else %>
+        <% other = @conversation.other_user(current_user) %>
+        <div class="w-10 h-10 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold flex-shrink-0"
+             id="contact-presence-avatar">
+          <%= other&.display_name&.first&.upcase || "?" %>
+        </div>
+      <% end %>
+
+      <div class="flex-1 min-w-0">
+        <h2 class="text-white font-medium text-sm"><%= @conversation.display_name_for(current_user) %></h2>
+        <p class="text-[#8696a0] text-xs" id="contact-status">
+          <% if @conversation.conversation_type_direct? %>
+            <%= @conversation.other_user(current_user)&.display_last_seen %>
+          <% else %>
+            <%= @conversation.users.map(&:display_name).join(", ").truncate(60) %>
+          <% end %>
+        </p>
+      </div>
+
+      <%# Voice / Video call buttons (direct chats only) %>
+      <% if @conversation.conversation_type_direct? %>
+        <% other = @conversation.other_user(current_user) %>
+        <%# Audio call %>
+        <button data-action="click->call#startCall"
+                data-user-id="<%= other&.id %>"
+                data-call-type="audio"
+                data-conversation-id="<%= @conversation.id %>"
+                class="p-2 rounded-full hover:bg-[#2a3942] transition-colors"
+                title="Chamada de voz">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        </button>
+        <%# Video call %>
+        <button data-action="click->call#startCall"
+                data-user-id="<%= other&.id %>"
+                data-call-type="video"
+                data-conversation-id="<%= @conversation.id %>"
+                class="p-2 rounded-full hover:bg-[#2a3942] transition-colors"
+                title="Chamada de vídeo">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </button>
+      <% end %>
+
+      <div class="flex items-center gap-1"
+           data-controller="message-search"
+           data-message-search-url-value="<%= search_conversation_messages_path(@conversation) %>">
+        <%# Search button %>
+        <button data-action="click->message-search#toggle"
+                class="p-2 rounded-full hover:bg-[#2a3942] transition-colors" title="Buscar mensagens">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#aebac1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+        </button>
+
+        <%# Archive button %>
+        <%= button_to archive_conversation_path(@conversation), method: :patch,
+              class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors text-[#aebac1] hover:text-white",
+              title: "Arquivar conversa" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+        <% end %>
+
+        <%# Pin button %>
+        <% participant = @conversation.participants.find_by(user: current_user) %>
+        <%= button_to toggle_pin_conversation_path(@conversation), method: :patch,
+              class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors #{participant&.pinned? ? 'text-[#00a884]' : 'text-[#aebac1]'}",
+              title: participant&.pinned? ? "Desafixar" : "Fixar conversa" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          </svg>
+        <% end %>
+
+        <%# Search panel (hidden by default) %>
+        <div data-message-search-target="panel"
+             class="hidden absolute top-16 right-0 w-80 bg-[#202c33] border border-[#2a3942] rounded-xl shadow-2xl z-30">
+          <div class="p-3 border-b border-[#2a3942] flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input type="text" placeholder="Buscar mensagens..."
+                   data-message-search-target="input"
+                   data-action="input->message-search#search"
+                   class="bg-transparent text-white placeholder-[#8696a0] text-sm outline-none flex-1">
+            <button data-action="click->message-search#close" class="text-[#8696a0] hover:text-white">✕</button>
+          </div>
+          <div data-message-search-target="results" class="max-h-80 overflow-y-auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <%# Typing indicator %>
+    <div id="typing-indicator"
+         class="hidden px-6 py-1 text-[#8696a0] text-xs italic">
+      <span id="typing-user-name"></span> está digitando...
+    </div>
+
+    <%# Messages area %>
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+         id="messages-container"
+         data-chat-target="messages"
+         style="background-color: #0b141a;">
+
+      <%# Infinite scroll trigger (top) — shown when there are more pages %>
+      <% if @pagy.page < @pagy.pages %>
+        <%= render "messages/load_more",
+              conversation: @conversation,
+              next_page: @pagy.page + 1 %>
+      <% end %>
+
+      <div id="messages">
+        <% @messages.each do |message| %>
+          <%= render "messages/message", message: message, current_user: current_user %>
+        <% end %>
+      </div>
+
+      <%# Scroll anchor — JS scrolls here on load %>
+      <div id="messages-bottom"></div>
+    </div>
+
+    <%# Message input area %>
+    <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942]">
+
+      <%# File preview %>
+      <div id="file-preview" class="hidden mb-3 p-3 bg-[#2a3942] rounded-lg flex items-center gap-3">
+        <div id="file-preview-content" class="flex-1"></div>
+        <button id="file-preview-remove" class="text-[#8696a0] hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <%= form_with url: conversation_messages_path(@conversation),
+                    method: :post,
+                    data: {
+                      chat_target: "form",
+                      action: "submit->chat#submitForm turbo:submit-end->chat#resetForm"
+                    },
+                    class: "flex items-end gap-2" do |f| %>
+
+        <%# Emoji button — TODO %>
+        <button type="button" class="p-2 text-[#8696a0] hover:text-white transition-colors flex-shrink-0 mb-1"
+                title="Emoji (em breve)">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        <%# Attachment button %>
+        <label class="p-2 text-[#8696a0] hover:text-white transition-colors cursor-pointer flex-shrink-0 mb-1"
+               title="Anexar arquivo">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+          <%= f.file_field :attachment, class: "hidden",
+                data: { action: "change->file-preview#showPreview", chat_target: "attachment" },
+                accept: "image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" %>
+        </label>
+
+        <%# Text input %>
+        <div class="flex-1 bg-[#2a3942] rounded-2xl px-4 py-2">
+          <%= f.text_area :content,
+                rows: 1,
+                placeholder: "Digite uma mensagem",
+                class: "w-full bg-transparent text-white placeholder-[#8696a0] text-sm outline-none resize-none max-h-32 leading-5",
+                data: {
+                  chat_target: "input",
+                  action: "keydown->chat#handleKeydown input->chat#autoResize input->typing#handleTyping"
+                } %>
+        </div>
+
+        <%# Send button %>
+        <button type="submit"
+                data-chat-target="submitButton"
+                class="p-2 bg-[#00a884] hover:bg-[#02966f] text-white rounded-full transition-colors flex-shrink-0 mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </button>
+      <% end %>
+    </div>
+  </div>
+</div>

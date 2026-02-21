@@ -1,0 +1,127 @@
+<% content_for :title, "Dashboard" %>
+
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+  <p class="text-[#8b949e] text-sm mt-1">Visão geral do sistema em tempo real</p>
+</div>
+
+<%# Stats grid %>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <%= render "admin/shared/stat_card",
+        label: "Usuários",
+        value: @stats[:total_users],
+        sub: "#{@stats[:new_users_today]} hoje",
+        color: "green",
+        icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" %>
+
+  <%= render "admin/shared/stat_card",
+        label: "Online agora",
+        value: @stats[:online_users],
+        sub: "usuários ativos",
+        color: "teal",
+        icon: "M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z" %>
+
+  <%= render "admin/shared/stat_card",
+        label: "Conversas",
+        value: @stats[:total_conversations],
+        sub: "#{@stats[:group_convos]} grupos",
+        color: "blue",
+        icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" %>
+
+  <%= render "admin/shared/stat_card",
+        label: "Mensagens",
+        value: @stats[:total_messages],
+        sub: "#{@stats[:messages_today]} hoje",
+        color: "purple",
+        icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" %>
+</div>
+
+<%# Activity chart + Recent users %>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+  <%# Messages last 7 days %>
+  <div class="lg:col-span-2 bg-[#161b22] border border-[#30363d] rounded-xl p-6">
+    <h2 class="text-white font-semibold mb-4">Mensagens — últimos 7 dias</h2>
+    <div class="flex items-end gap-2 h-32">
+      <% max_val = [@messages_by_day.values.max, 1].max %>
+      <% 7.downto(0) do |days_ago| %>
+        <% date  = days_ago.days.ago.to_date %>
+        <% count = @messages_by_day[date] || 0 %>
+        <% pct   = (count.to_f / max_val * 100).round %>
+        <div class="flex-1 flex flex-col items-center gap-1">
+          <span class="text-[#8b949e] text-[10px]"><%= count %></span>
+          <div class="w-full bg-[#21262d] rounded-t relative" style="height: 80px;">
+            <div class="absolute bottom-0 left-0 right-0 bg-[#00a884] rounded-t transition-all"
+                 style="height: <%= pct %>%;"></div>
+          </div>
+          <span class="text-[#8b949e] text-[10px]"><%= date.strftime("%d/%m") %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Recent users %>
+  <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-white font-semibold">Novos usuários</h2>
+      <%= link_to "Ver todos →", admin_users_path, class: "text-[#58a6ff] text-xs hover:underline" %>
+    </div>
+    <div class="space-y-3">
+      <% @recent_users.each do |user| %>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-[#30363d] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+            <%= user.display_name.first.upcase %>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-white text-sm truncate"><%= user.display_name %></p>
+            <p class="text-[#8b949e] text-xs truncate"><%= user.email %></p>
+          </div>
+          <% if user.role_admin? %>
+            <span class="text-[10px] bg-[#1f6feb]/20 text-[#58a6ff] px-1.5 py-0.5 rounded">admin</span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Recent messages %>
+<div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-white font-semibold">Mensagens recentes</h2>
+    <%= link_to "Ver conversas →", admin_conversations_path, class: "text-[#58a6ff] text-xs hover:underline" %>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-[#8b949e] text-xs border-b border-[#30363d]">
+          <th class="text-left pb-2 font-medium">Remetente</th>
+          <th class="text-left pb-2 font-medium">Mensagem</th>
+          <th class="text-left pb-2 font-medium">Conversa</th>
+          <th class="text-left pb-2 font-medium">Horário</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-[#21262d]">
+        <% @recent_messages.each do |msg| %>
+          <tr class="hover:bg-[#21262d] transition-colors">
+            <td class="py-2 pr-4">
+              <span class="text-white"><%= msg.sender.display_name %></span>
+            </td>
+            <td class="py-2 pr-4 text-[#8b949e] max-w-xs truncate">
+              <%= msg.content&.truncate(60) || "[anexo]" %>
+            </td>
+            <td class="py-2 pr-4">
+              <%= link_to admin_conversation_path(msg.conversation),
+                    class: "text-[#58a6ff] hover:underline" do %>
+                #<%= msg.conversation_id %>
+              <% end %>
+            </td>
+            <td class="py-2 text-[#8b949e] whitespace-nowrap">
+              <%= msg.created_at.strftime("%d/%m %H:%M") %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

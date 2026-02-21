@@ -1,0 +1,87 @@
+<% content_for :title, @template.name %>
+
+<div class="flex items-center gap-4 mb-8">
+  <%= link_to marketing_templates_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  <% end %>
+  <div>
+    <h1 class="text-2xl font-semibold text-white"><%= @template.name %></h1>
+    <p class="text-[#8696a0] text-sm">Criado <%= time_ago_in_words(@template.created_at) %> atrás</p>
+  </div>
+  <div class="ml-auto flex gap-3">
+    <%= link_to edit_marketing_template_path(@template),
+          class: "bg-[#2a3942] hover:bg-[#3b4a54] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors" do %>
+      Editar
+    <% end %>
+    <%= link_to new_marketing_campaign_path(template_id: @template.id),
+          class: "bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors" do %>
+      Criar Campanha
+    <% end %>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  <%# Details %>
+  <div class="space-y-4">
+    <div class="bg-[#202c33] rounded-xl p-5 space-y-3">
+      <% if @template.header_type != "none" %>
+        <div>
+          <p class="text-[#8696a0] text-xs uppercase font-semibold">Cabeçalho</p>
+          <% if @template.header_type == "image" && @template.header_image.attached? %>
+            <%= image_tag @template.header_image, class: "mt-2 rounded-lg max-h-48 object-cover" %>
+          <% else %>
+            <p class="text-white text-sm mt-1"><%= @template.header_text %></p>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div>
+        <p class="text-[#8696a0] text-xs uppercase font-semibold">Corpo</p>
+        <p class="text-[#d1d7db] text-sm mt-1 whitespace-pre-wrap"><%= @template.body %></p>
+      </div>
+
+      <% if @template.footer.present? %>
+        <div>
+          <p class="text-[#8696a0] text-xs uppercase font-semibold">Rodapé</p>
+          <p class="text-[#8696a0] text-sm mt-1 italic"><%= @template.footer %></p>
+        </div>
+      <% end %>
+
+      <% if @template.has_buttons? %>
+        <div>
+          <p class="text-[#8696a0] text-xs uppercase font-semibold mb-2">Botões</p>
+          <div class="flex flex-wrap gap-2">
+            <% @template.buttons.each do |btn| %>
+              <span class="border border-[#00a884] text-[#00a884] text-xs px-3 py-1.5 rounded-lg">
+                <%= btn["label"] %>
+                <span class="text-[#8696a0] ml-1">(<%= btn["type"] %>)</span>
+              </span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @template.has_list? %>
+        <div>
+          <p class="text-[#8696a0] text-xs uppercase font-semibold mb-2">Lista</p>
+          <% @template.list_sections.each do |section| %>
+            <p class="text-white text-xs font-semibold"><%= section["title"] %></p>
+            <% (section["rows"] || []).each do |row| %>
+              <p class="text-[#d1d7db] text-xs ml-3 mt-0.5">• <%= row["title"] %></p>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Preview %>
+  <div>
+    <h3 class="text-[#8696a0] text-xs uppercase font-semibold mb-3">Prévia</h3>
+    <div class="bg-[#0b141a] rounded-2xl p-6">
+      <%= render "marketing/templates/preview", template: @template %>
+    </div>
+  </div>
+</div>

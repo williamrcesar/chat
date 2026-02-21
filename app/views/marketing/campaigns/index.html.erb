@@ -1,0 +1,69 @@
+<% content_for :title, "Campanhas" %>
+
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-semibold text-white">Campanhas</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Envie templates para até 1000 pessoas por dia. Acompanhe o progresso no Kanban.</p>
+  </div>
+  <%= link_to new_marketing_campaign_path,
+        class: "bg-[#00a884] hover:bg-[#02966f] text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2" do %>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+    </svg>
+    Nova Campanha
+  <% end %>
+</div>
+
+<% if @campaigns.empty? %>
+  <div class="flex flex-col items-center justify-center py-24 text-[#8696a0]">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+    <p class="text-lg">Nenhuma campanha ainda.</p>
+  </div>
+<% else %>
+  <div class="space-y-3">
+    <% @campaigns.each do |campaign| %>
+      <%= link_to marketing_campaign_path(campaign), class: "block bg-[#202c33] rounded-xl p-5 border border-[#2a3942] hover:border-[#3b4a54] transition-colors" do %>
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-white font-semibold"><%= campaign.name %></h3>
+            <p class="text-[#8696a0] text-sm mt-0.5">Template: <%= campaign.marketing_template.name %></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <% badge_class = case campaign.status
+               when "running"   then "bg-green-500/20 text-green-400"
+               when "paused"    then "bg-yellow-500/20 text-yellow-400"
+               when "completed" then "bg-blue-500/20 text-blue-400"
+               else                  "bg-[#2a3942] text-[#8696a0]"
+               end %>
+            <span class="<%= badge_class %> text-xs px-2.5 py-1 rounded-full font-semibold capitalize">
+              <%= campaign.status %>
+            </span>
+          </div>
+        </div>
+
+        <%# Mini progress bar %>
+        <div class="mt-4 grid grid-cols-5 gap-2 text-xs text-center">
+          <% [
+            ["Fila",      campaign.queued_count,    "#8696a0"],
+            ["Enviado",   campaign.sent_count,      "#d1d7db"],
+            ["Entregue",  campaign.delivered_count, "#00a884"],
+            ["Lido",      campaign.read_count,      "#34b7f1"],
+            ["Clicou",    campaign.clicked_count,   "#25d366"]
+          ].each do |label, count, color| %>
+            <div>
+              <p class="font-bold text-lg" style="color: <%= color %>"><%= count %></p>
+              <p class="text-[#8696a0]"><%= label %></p>
+            </div>
+          <% end %>
+        </div>
+
+        <p class="text-[#8696a0] text-xs mt-3">
+          <%= campaign.recipient_identifiers.size %> destinatários ·
+          Criada <%= time_ago_in_words(campaign.created_at) %> atrás
+        </p>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

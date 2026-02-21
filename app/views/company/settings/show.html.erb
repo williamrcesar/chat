@@ -1,0 +1,54 @@
+<% content_for :title, "Configurações" %>
+
+<div class="max-w-3xl">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-white">Configurações da Empresa</h1>
+      <p class="text-[#8696a0] text-sm mt-1">Perfil e menu de atendimento</p>
+    </div>
+    <%= link_to edit_company_settings_path,
+          class: "bg-[#2a3942] hover:bg-[#3b4a54] text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors" do %>
+      Editar
+    <% end %>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <%# Company Info %>
+    <div class="bg-[#202c33] rounded-xl p-5">
+      <h2 class="text-white text-sm font-semibold mb-4">Informações</h2>
+      <dl class="space-y-3 text-sm">
+        <div>
+          <dt class="text-[#8696a0] text-xs">Nome</dt>
+          <dd class="text-white mt-0.5"><%= @company.name %></dd>
+        </div>
+        <div>
+          <dt class="text-[#8696a0] text-xs">Nickname</dt>
+          <dd class="text-[#00a884] mt-0.5">@<%= @company.nickname %></dd>
+        </div>
+        <% if @company.description.present? %>
+          <div>
+            <dt class="text-[#8696a0] text-xs">Descrição</dt>
+            <dd class="text-white mt-0.5"><%= @company.description %></dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+
+    <%# Menu Config Preview %>
+    <div class="bg-[#202c33] rounded-xl p-5">
+      <h2 class="text-white text-sm font-semibold mb-4">Menu de Atendimento</h2>
+      <p class="text-[#8696a0] text-xs mb-3">Mensagem de saudação:</p>
+      <p class="text-[#d1d7db] text-sm bg-[#2a3942] rounded-lg px-3 py-2 mb-4"><%= @company.greeting %></p>
+      <p class="text-[#8696a0] text-xs mb-2">Departamentos:</p>
+      <div class="space-y-2">
+        <% @company.departments.each do |dept| %>
+          <div class="flex items-center gap-3 bg-[#2a3942] rounded-lg px-3 py-2">
+            <div class="w-2 h-2 rounded-full bg-[#00a884] flex-shrink-0"></div>
+            <span class="text-white text-sm flex-1"><%= dept["label"] %></span>
+            <span class="text-[#8696a0] text-xs"><%= dept["role_name"] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

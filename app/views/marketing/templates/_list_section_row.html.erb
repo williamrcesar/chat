@@ -1,0 +1,47 @@
+<%# Partial for a list section + rows in the template builder %>
+<div class="bg-[#2a3942] rounded-lg p-3 space-y-2" data-template-builder-target="listSection">
+  <div class="flex items-center gap-2">
+    <input type="text"
+           name="marketing_template[list_sections][<%= section_index %>][title]"
+           value="<%= section["title"] || section[:title] %>"
+           placeholder="Título da seção"
+           class="flex-1 bg-[#1f2c34] text-white placeholder-[#8696a0] rounded-lg px-3 py-1.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+    <button type="button"
+            data-action="click->template-builder#removeListSection"
+            class="text-[#8696a0] hover:text-red-400 p-1 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+
+  <% (section["rows"] || section[:rows] || []).each_with_index do |row, ri| %>
+    <div class="flex gap-2 items-center pl-3">
+      <input type="text"
+             name="marketing_template[list_sections][<%= section_index %>][rows][<%= ri %>][id]"
+             value="<%= row["id"] || row[:id] %>"
+             placeholder="ID"
+             class="w-16 bg-[#1f2c34] text-white placeholder-[#8696a0] rounded-lg px-2 py-1.5 text-xs outline-none border border-transparent focus:border-[#00a884]">
+      <input type="text"
+             name="marketing_template[list_sections][<%= section_index %>][rows][<%= ri %>][title]"
+             value="<%= row["title"] || row[:title] %>"
+             placeholder="Título da opção"
+             class="flex-1 bg-[#1f2c34] text-white placeholder-[#8696a0] rounded-lg px-2 py-1.5 text-xs outline-none border border-transparent focus:border-[#00a884]">
+      <input type="text"
+             name="marketing_template[list_sections][<%= section_index %>][rows][<%= ri %>][desc]"
+             value="<%= row["desc"] || row[:desc] %>"
+             placeholder="Descrição"
+             class="flex-1 bg-[#1f2c34] text-white placeholder-[#8696a0] rounded-lg px-2 py-1.5 text-xs outline-none border border-transparent focus:border-[#00a884]">
+    </div>
+  <% end %>
+
+  <button type="button"
+          data-action="click->template-builder#addListRow"
+          data-section-index="<%= section_index %>"
+          class="text-[#00a884] hover:text-[#02966f] text-xs flex items-center gap-1 ml-3 mt-1">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+    </svg>
+    Adicionar opção
+  </button>
+</div>

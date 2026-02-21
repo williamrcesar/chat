@@ -1,0 +1,17 @@
+<% content_for :title, "Editar Template" %>
+
+<div class="flex h-screen bg-[#111b21]">
+  <div class="w-full max-w-2xl mx-auto p-6 overflow-y-auto">
+    <div class="flex items-center gap-4 mb-8">
+      <%= link_to templates_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      <% end %>
+      <h1 class="text-white text-xl font-medium">Editar Template</h1>
+    </div>
+    <div class="bg-[#202c33] rounded-2xl p-8">
+      <%= render "form", template: @template %>
+    </div>
+  </div>
+</div>

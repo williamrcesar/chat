@@ -1,0 +1,48 @@
+<% content_for :title, "Meu Perfil" %>
+
+<div class="flex h-screen bg-[#111b21]">
+  <div class="w-full max-w-2xl mx-auto p-6">
+
+    <div class="flex items-center gap-4 mb-8">
+      <%= link_to root_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      <% end %>
+      <h1 class="text-white text-xl font-medium">Informações do perfil</h1>
+    </div>
+
+    <div class="bg-[#202c33] rounded-2xl p-8">
+      <div class="flex flex-col items-center mb-8">
+        <% if current_user.avatar.attached? %>
+          <%= image_tag current_user.avatar, class: "w-32 h-32 rounded-full object-cover mb-4" %>
+        <% else %>
+          <div class="w-32 h-32 rounded-full bg-[#6a7175] flex items-center justify-center text-white text-4xl font-semibold mb-4">
+            <%= current_user.display_name.first.upcase %>
+          </div>
+        <% end %>
+        <h2 class="text-white text-xl font-medium"><%= current_user.display_name %></h2>
+        <p class="text-[#8696a0] text-sm"><%= current_user.email %></p>
+        <p class="text-[#8696a0] text-xs mt-1"><%= current_user.display_last_seen %></p>
+      </div>
+
+      <div class="space-y-4 mb-6">
+        <div class="border-b border-[#2a3942] pb-4">
+          <p class="text-[#00a884] text-xs font-semibold uppercase tracking-wide mb-1">Bio</p>
+          <p class="text-[#d1d7db] text-sm"><%= current_user.bio.presence || "Nenhuma bio configurada." %></p>
+        </div>
+        <div class="border-b border-[#2a3942] pb-4">
+          <p class="text-[#00a884] text-xs font-semibold uppercase tracking-wide mb-1">Telefone</p>
+          <p class="text-[#d1d7db] text-sm"><%= current_user.phone.presence || "Não informado" %></p>
+        </div>
+      </div>
+
+      <%= link_to edit_profile_path, class: "w-full flex items-center justify-center gap-2 bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+        Editar Perfil
+      <% end %>
+    </div>
+  </div>
+</div>

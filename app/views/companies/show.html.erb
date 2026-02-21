@@ -1,0 +1,39 @@
+<% content_for :title, @company.name %>
+
+<div class="flex items-center justify-center min-h-screen bg-[#111b21]">
+  <div class="w-full max-w-md text-center">
+    <div class="bg-[#202c33] rounded-2xl p-8 shadow-2xl">
+      <% if @company.logo.attached? %>
+        <%= image_tag @company.logo, class: "w-24 h-24 rounded-full object-cover mx-auto mb-4" %>
+      <% else %>
+        <div class="w-24 h-24 rounded-full bg-[#00a884] flex items-center justify-center mx-auto mb-4">
+          <span class="text-white font-bold text-3xl"><%= @company.name.first.upcase %></span>
+        </div>
+      <% end %>
+
+      <h1 class="text-white text-2xl font-semibold"><%= @company.name %></h1>
+      <p class="text-[#00a884] text-sm mt-1">@<%= @company.nickname %></p>
+
+      <% if @company.description.present? %>
+        <p class="text-[#8696a0] text-sm mt-3 leading-relaxed"><%= @company.description %></p>
+      <% end %>
+
+      <div class="mt-4 flex items-center justify-center gap-3 text-[#8696a0] text-xs">
+        <span><%= @company.company_attendants.count %> atendentes</span>
+        <span>·</span>
+        <span class="<%= @company.status_active? ? 'text-[#25d366]' : 'text-red-400' %>">
+          <%= @company.status_active? ? "Ativo" : "Suspenso" %>
+        </span>
+      </div>
+
+      <% if user_signed_in? %>
+        <div class="mt-6">
+          <%= button_to "Entrar em Contato", contact_requests_path,
+                method: :post,
+                params: { nickname: @company.nickname, message_type: "text", message_content: "Olá! Gostaria de atendimento." },
+                class: "w-full bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

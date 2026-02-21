@@ -1,0 +1,140 @@
+<%# Template builder form — shared between new and edit %>
+<%= form_with model: [:marketing, template], multipart: true,
+      data: { controller: "template-builder" },
+      class: "grid grid-cols-1 lg:grid-cols-2 gap-8" do |f| %>
+
+  <%# LEFT COLUMN — editor %>
+  <div class="space-y-6">
+    <% if template.errors.any? %>
+      <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+        <% template.errors.full_messages.each do |msg| %>
+          <p class="text-red-400 text-sm"><%= msg %></p>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%# Name %>
+    <div>
+      <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Nome do template *</label>
+      <%= f.text_field :name, placeholder: "Ex: Promoção de Verão",
+            class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+    </div>
+
+    <%# Header %>
+    <div class="bg-[#202c33] rounded-xl p-4 space-y-3">
+      <h3 class="text-white text-sm font-semibold">Cabeçalho (opcional)</h3>
+      <div class="flex gap-3">
+        <% [["none","Nenhum"],["text","Texto"],["image","Imagem"]].each do |val, label| %>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <%= f.radio_button :header_type, val,
+                  data: { action: "change->template-builder#updateHeader" },
+                  class: "accent-[#00a884]" %>
+            <span class="text-[#d1d7db] text-sm"><%= label %></span>
+          </label>
+        <% end %>
+      </div>
+
+      <div data-template-builder-target="headerText"
+           class="<%= template.header_type == 'text' ? '' : 'hidden' %>">
+        <%= f.text_field :header_text, placeholder: "Texto do cabeçalho",
+              class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+      </div>
+
+      <div data-template-builder-target="headerImage"
+           class="<%= template.header_type == 'image' ? '' : 'hidden' %>">
+        <%= f.file_field :header_image, accept: "image/*",
+              class: "text-[#8696a0] text-sm" %>
+        <% if template.persisted? && template.header_image.attached? %>
+          <p class="text-[#8696a0] text-xs mt-1">Imagem atual: <%= template.header_image.filename %></p>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Body %>
+    <div>
+      <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Corpo da mensagem *</label>
+      <%= f.text_area :body, rows: 5,
+            placeholder: "Olá {{name}}! Temos uma promoção especial para você.",
+            data: { action: "input->template-builder#updatePreview" },
+            class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884] resize-none" %>
+      <p class="text-[#8696a0] text-xs mt-1">Use {{variavel}} para variáveis dinâmicas.</p>
+    </div>
+
+    <%# Footer %>
+    <div>
+      <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Rodapé (opcional)</label>
+      <%= f.text_field :footer, placeholder: "Powered by Chat App",
+            data: { action: "input->template-builder#updatePreview" },
+            class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+    </div>
+
+    <%# Buttons section %>
+    <div class="bg-[#202c33] rounded-xl p-4 space-y-3"
+         data-template-builder-target="buttonsSection">
+      <div class="flex items-center justify-between">
+        <h3 class="text-white text-sm font-semibold">Botões (até 3)</h3>
+        <button type="button"
+                data-action="click->template-builder#addButton"
+                class="text-[#00a884] hover:text-[#02966f] text-xs font-semibold flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Adicionar botão
+        </button>
+      </div>
+
+      <div data-template-builder-target="buttonsList" class="space-y-2">
+        <% (template.buttons || []).each_with_index do |btn, i| %>
+          <%= render "marketing/templates/button_row", f: f, btn: btn, index: i %>
+        <% end %>
+      </div>
+    </div>
+
+    <%# List section %>
+    <div class="bg-[#202c33] rounded-xl p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-white text-sm font-semibold">Lista (menu de opções)</h3>
+        <button type="button"
+                data-action="click->template-builder#addListSection"
+                class="text-[#00a884] hover:text-[#02966f] text-xs font-semibold flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Adicionar seção
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-[#8696a0] text-xs mb-1">Título da lista</label>
+        <input type="text" name="marketing_template[list_header][text]"
+               value="<%= template.list_header&.dig("text") || template.list_header&.dig(:text) %>"
+               placeholder="Escolha uma opção"
+               class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2 text-sm outline-none border border-transparent focus:border-[#00a884]">
+      </div>
+
+      <div data-template-builder-target="listSections" class="space-y-3">
+        <% (template.list_sections || []).each_with_index do |section, si| %>
+          <%= render "marketing/templates/list_section_row", section: section, section_index: si %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# RIGHT COLUMN — live preview %>
+  <div class="lg:sticky lg:top-8 h-fit">
+    <h3 class="text-[#8696a0] text-xs font-semibold uppercase tracking-wide mb-3">Pré-visualização</h3>
+    <div class="bg-[#0b141a] rounded-2xl p-4 min-h-[300px]"
+         style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22><rect fill=%22%230b141a%22 width=%22300%22 height=%22300%22/></svg>')">
+      <div data-template-builder-target="preview" class="max-w-[280px]">
+        <%= render "marketing/templates/preview", template: template %>
+      </div>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+      <%= f.submit template.persisted? ? "Salvar Alterações" : "Criar Template",
+            class: "flex-1 bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
+      <%= link_to "Cancelar", marketing_templates_path,
+            class: "px-5 py-3 text-[#8696a0] hover:text-white text-sm font-semibold rounded-lg transition-colors border border-[#2a3942] hover:border-[#3b4a54]" %>
+    </div>
+  </div>
+<% end %>

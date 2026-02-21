@@ -1,0 +1,100 @@
+<% content_for :title, "Atendentes" %>
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-white">Atendentes</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Gerencie sua equipe de atendimento</p>
+  </div>
+  <% if @current_company.supervisor?(current_user) %>
+    <%= link_to new_company_attendant_path,
+          class: "bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2" do %>
+      + Adicionar Atendente
+    <% end %>
+  <% end %>
+</div>
+
+<% if @attendants.empty? %>
+  <div class="text-center py-20 text-[#8696a0]">
+    <p>Nenhum atendente cadastrado ainda.</p>
+  </div>
+<% else %>
+  <div class="bg-[#202c33] rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-[#2a3942] text-[#8696a0] text-xs uppercase">
+          <th class="px-4 py-3 text-left">Atendente</th>
+          <th class="px-4 py-3 text-left">Departamento</th>
+          <th class="px-4 py-3 text-left">Tipo</th>
+          <th class="px-4 py-3 text-left">Tags</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Papel</th>
+          <% if @current_company.supervisor?(current_user) %>
+            <th class="px-4 py-3 text-left">Ações</th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-[#2a3942]">
+        <% @attendants.each do |attendant| %>
+          <tr class="hover:bg-[#2a3942]/40 transition-colors">
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold text-xs">
+                  <%= attendant.user.display_name.first.upcase %>
+                </div>
+                <div>
+                  <p class="text-white text-sm font-medium"><%= attendant.user.display_name %></p>
+                  <% if attendant.user.nickname.present? %>
+                    <p class="text-[#8696a0] text-xs">@<%= attendant.user.nickname %></p>
+                  <% end %>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-[#d1d7db] text-sm"><%= attendant.role_name %></td>
+            <td class="px-4 py-3">
+              <span class="<%= attendant.attendant_type_ai? ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3942] text-[#d1d7db]' %> text-xs px-2 py-0.5 rounded-full">
+                <%= attendant.attendant_type_ai? ? "IA" : "Humano" %>
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <% (attendant.tags || []).each do |tag| %>
+                  <span class="bg-[#2a3942] text-[#8696a0] text-xs px-2 py-0.5 rounded-full"><%= tag %></span>
+                <% end %>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full <%= attendant.status_available? ? 'bg-[#25d366]' : attendant.status_busy? ? 'bg-yellow-400' : 'bg-[#8696a0]' %>"></div>
+                <span class="text-[#d1d7db] text-xs">
+                  <%= { "available" => "Disponível", "busy" => "Ocupado", "offline" => "Offline" }[attendant.status] %>
+                </span>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <% if attendant.is_supervisor? %>
+                <span class="bg-[#00a884]/20 text-[#00a884] text-xs px-2 py-0.5 rounded-full">Supervisor</span>
+              <% else %>
+                <span class="text-[#8696a0] text-xs">Atendente</span>
+              <% end %>
+            </td>
+            <% if @current_company.supervisor?(current_user) %>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <%= link_to edit_company_attendant_path(attendant),
+                        class: "text-[#8696a0] hover:text-[#00a884] text-xs transition-colors" do %>
+                    Editar
+                  <% end %>
+                  <%= button_to company_attendant_path(attendant), method: :delete,
+                        data: { confirm: "Remover #{attendant.user.display_name} da equipe?" },
+                        class: "text-[#8696a0] hover:text-red-400 text-xs transition-colors" do %>
+                    Remover
+                  <% end %>
+                </div>
+              </td>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
