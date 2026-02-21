@@ -13,6 +13,6 @@ class CreateCompanies < ActiveRecord::Migration[7.2]
     end
 
     add_index :companies, :nickname, unique: true
-    add_index :companies, :owner_id
+    # owner_id index is created automatically by t.references above
   end
 end

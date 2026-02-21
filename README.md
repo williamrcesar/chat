@@ -481,7 +481,7 @@ openssl rand -hex 64  # → DEVISE_JWT_SECRET_KEY
 - [x] **Interactive Message Lock** (24h block until button/list clicked) ✅
 - [x] **Company Multi-Agent Inbox** (departments, routing, supervisor dashboard) ✅
 - [ ] **Disappearing messages**
-- [ ] **Stories / Status**
+- [ ] **Stories / Status**#
 - [ ] **Block users**
 - [ ] **Rate limiting** (rack-attack)
 - [ ] **Webhooks for external events**
