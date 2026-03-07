@@ -18,6 +18,7 @@ self.addEventListener("push", async (event) => {
     icon:    payload.icon    || "/icon.png",
     badge:   payload.badge   || "/icon.png",
     vibrate: [200, 100, 200],
+    silent:  false,
     data:    payload.data    || { path: "/" },
     actions: [
       { action: "open",    title: "Open chat" },
@@ -25,7 +26,15 @@ self.addEventListener("push", async (event) => {
     ]
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() =>
+      clients.matchAll({ type: "window", includeUncontrolled: true })
+    ).then((clientList) => {
+      clientList.forEach((client) => {
+        client.postMessage({ type: "play-notification-sound" });
+      });
+    })
+  );
 });
 
 // ── Notification click handler ────────────────────────────────────────────────

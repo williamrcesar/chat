@@ -119,10 +119,13 @@ class Message < ApplicationRecord
         preview_html:    preview_html
       })
 
-      # Push notification for offline recipients only (skip sender)
+      # Web Push for all recipients with subscription (skip sender).
+      # Sent even when user is online so they get a notification in another tab or when not focused on this conversation.
       next if participant.user_id == sender_id
-      next if participant.user.online?
-      next if participant.user.web_push_subscriptions.none?
+      if participant.user.web_push_subscriptions.none?
+        Rails.logger.info("[WebPush] Skipped: user_id=#{participant.user_id} has no subscriptions (recipient must enable notifications in the app on that device)")
+        next
+      end
 
       push_payload = {
         title:   sender.display_name,
@@ -132,6 +135,7 @@ class Message < ApplicationRecord
         data:    { path: "/conversations/#{conversation_id}" }
       }
       WebPushNotificationJob.perform_later(participant.user_id, push_payload)
+      Rails.logger.info("[WebPush] Enqueued push for user_id=#{participant.user_id} (see worker log for result)")
     end
 
     # Marcar como entregue e notificar o remetente (dois risquinhos cinza)
@@ -142,11 +146,19 @@ class Message < ApplicationRecord
   end
 
   def push_body
-    return "sent you an image"    if attachment.attached? && image?
-    return "sent you an audio"    if attachment.attached? && audio?
-    return "sent you a video"     if attachment.attached? && video?
-    return "sent you a document"  if attachment.attached? && document?
-    content.to_s.truncate(100)
+    if attachment.attached?
+      base = case
+             when image?    then "sent you an image"
+             when audio?    then "sent you an audio"
+             when video?    then "sent you a video"
+             when document? then "sent you a document"
+             else "sent you a file"
+             end
+      base += ": #{content.to_s.truncate(80)}" if content.present?
+      base
+    else
+      content.to_s.truncate(120)
+    end
   end
 
   def touch_conversation
