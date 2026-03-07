@@ -8,6 +8,7 @@ class ChatChannel < ApplicationCable::Channel
       current_user.touch_online!
       broadcast_presence(true)
       broadcast_interactive_lock_state
+      mark_sent_messages_delivered_for_subscriber!
     else
       reject
     end
@@ -44,6 +45,22 @@ class ChatChannel < ApplicationCable::Channel
     participant&.mark_read!
   end
 
+  # Destinatário confirma que recebeu a mensagem → 2 marcas cinzas na hora para o remetente
+  def message_received(data)
+    return unless @conversation
+    message_id = data["message_id"].presence || data[:message_id]
+    return unless message_id
+
+    message = Message.find_by(id: message_id, conversation_id: @conversation.id)
+    return unless message
+    return if message.sender_id == current_user.id # só destinatário confirma
+
+    if message.status_sent?
+      message.mark_delivered!
+      MessageUpdateBroadcastJob.perform_now(message_id)
+    end
+  end
+
   private
 
   def broadcast_interactive_lock_state
@@ -75,5 +92,18 @@ class ChatChannel < ApplicationCable::Channel
         }
       )
     end
+  end
+
+  # Usuário ficou online (abriu o app e uma conversa) → marcar como entregues todas as mensagens
+  # "sent" dirigidas a ele em TODAS as conversas. 1 check = offline; 2 checks cinzas = online.
+  def mark_sent_messages_delivered_for_subscriber!
+    Message
+      .where(conversation_id: current_user.conversation_ids)
+      .where(status: Message.statuses[:sent])
+      .where.not(sender_id: current_user.id)
+      .find_each do |message|
+        message.mark_delivered!
+        MessageUpdateBroadcastJob.perform_later(message.id)
+      end
   end
 end

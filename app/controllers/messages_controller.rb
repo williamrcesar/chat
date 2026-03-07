@@ -8,19 +8,36 @@ class MessagesController < ApplicationController
     content = message_params[:content].presence
 
     if attachments.size > 1
-      # Vários anexos: uma mensagem por arquivo (primeira pode ter texto)
+      # Idempotência por client_message_id: se já processamos este envio, não duplicar
+      client_message_id = message_params[:client_message_id].presence
+      if client_message_id && message_with_client_id_exists?(client_message_id)
+        authorize Message.new(conversation: @conversation, sender: current_user)
+        respond_to do |format|
+          format.turbo_stream { head :no_content }
+          format.html { redirect_to conversation_path(@conversation) }
+        end
+        return
+      end
+
+      # Vários anexos: uma mensagem por arquivo (primeira pode ter texto); cada uma com o mesmo client_message_id
       base = message_params.to_h.symbolize_keys.slice(:content, :reply_to_id)
       @messages = attachments.each_with_index.map do |file, i|
         msg = @conversation.messages.build(
           base.merge(content: i.zero? ? content : nil, sender: current_user)
         )
+        msg.metadata = (msg.metadata || {}).merge("client_message_id" => client_message_id) if client_message_id.present?
         msg.attachment.attach(file)
         msg.message_type = detect_message_type(file)
         authorize msg
         msg.save! ? msg : nil
       end.compact
       if @messages.any?
-        @messages.each { |msg| fetch_link_preview_now(msg) }
+        @messages.each do |msg|
+          msg.mark_sent!
+          mark_delivered_if_recipient_online!(msg)
+          broadcast_new_message_to_recipients(msg)
+          fetch_link_preview_now(msg)
+        end
         @conversation.participants.find_by(user: current_user)&.mark_read!
         respond_to do |format|
           format.turbo_stream
@@ -30,15 +47,48 @@ class MessagesController < ApplicationController
         redirect_to conversation_path(@conversation), alert: "Não foi possível enviar."
       end
     else
+      client_message_id = message_params[:client_message_id].presence
+      if client_message_id && message_with_client_id_exists?(client_message_id)
+        authorize Message.new(conversation: @conversation, sender: current_user)
+        respond_to do |format|
+          format.turbo_stream { head :no_content }
+          format.html { redirect_to conversation_path(@conversation) }
+        end
+        return
+      end
+
+      # Fallback: mesmo texto, mesmo usuário, mesma conversa, nos últimos 2s = duplicata (evita envios que passaram pelo cliente)
+      if attachments.none? && content.present?
+        dup = @conversation.messages
+          .where(sender_id: current_user.id)
+          .where("created_at >= ?", 2.seconds.ago)
+          .where("TRIM(COALESCE(content, '')) = ?", content.to_s.strip)
+          .order(created_at: :desc)
+          .first
+        if dup
+          authorize Message.new(conversation: @conversation, sender: current_user)
+          respond_to do |format|
+            format.turbo_stream { head :no_content }
+            format.html { redirect_to conversation_path(@conversation) }
+          end
+          return
+        end
+      end
+
       # Um anexo ou só texto (não passar attachment ao build — evita "expected attachable, got []")
-      @message = @conversation.messages.build(message_params.except(:attachment))
+      @message = @conversation.messages.build(message_params.except(:attachment, :client_message_id))
       @message.sender = current_user
+      @message.metadata = (@message.metadata || {}).merge("client_message_id" => client_message_id) if client_message_id.present?
       if attachments.one?
         @message.attachment.attach(attachments.first)
         @message.message_type = detect_message_type(attachments.first)
       end
       authorize @message
       if @message.save
+        @conversation.touch # ordenação da lista: última atividade (envio) já no topo
+        @message.mark_sent!
+        mark_delivered_if_recipient_online!(@message)
+        broadcast_new_message_to_recipients(@message)
         fetch_link_preview_now(@message)
         @conversation.participants.find_by(user: current_user)&.mark_read!
         respond_to do |format|
@@ -162,7 +212,7 @@ class MessagesController < ApplicationController
   end
 
   def message_params
-    params.require(:message).permit(:content, :reply_to_id, attachment: [])
+    params.require(:message).permit(:content, :reply_to_id, :client_message_id, attachment: [])
   end
 
   def detect_message_type(file)
@@ -175,10 +225,46 @@ class MessagesController < ApplicationController
     end
   end
 
-  # Busca o preview de link já na resposta para aparecer no turbo_stream; também faz broadcast para os outros.
   def fetch_link_preview_now(message)
     return unless message.content.to_s.match?(%r{\bhttps?://})
-    LinkPreviewJob.perform_now(message.id)
-    message.reload
+    LinkPreviewJob.perform_later(message.id)
+  end
+
+  # Verifica se já existe mensagem(ns) com este client_message_id (mesmo envio = idempotência).
+  def message_with_client_id_exists?(client_message_id)
+    @conversation.messages
+      .where(sender_id: current_user.id)
+      .where("metadata->>'client_message_id' = ?", client_message_id)
+      .exists?
+  end
+
+  # Se algum destinatário está online (app aberto), marcar como entregue de imediato → 2 checks cinzas.
+  def mark_delivered_if_recipient_online!(message)
+    return unless message.status_sent?
+    recipient_online = message.conversation.participants
+      .where.not(user_id: message.sender_id)
+      .joins(:user)
+      .where(users: { online: true })
+      .exists?
+    if recipient_online
+      message.mark_delivered!
+      MessageUpdateBroadcastJob.perform_later(message.id)
+    end
+  end
+
+  # Envia new_message para destinatários na hora (sem esperar Sidekiq), para os dois lados ficarem rápidos.
+  def broadcast_new_message_to_recipients(message)
+    message.attachment.blob if message.attachment.attached?
+    conversation = message.conversation
+    sender_id = message.sender_id
+    conversation.participants.includes(:user).each do |participant|
+      next if participant.user_id == sender_id
+      html = ApplicationController.renderer.render(
+        partial: "messages/message",
+        locals: { message: message, current_user: participant.user }
+      )
+      ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html, message_id: message.id })
+    end
+    message.update!(metadata: (message.metadata || {}).merge("new_message_sent_at" => Time.current.utc.iso8601))
   end
 end

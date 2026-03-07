@@ -19,7 +19,7 @@ class LinkPreviewJob < ApplicationJob
     return if preview.blank?
 
     message.update!(metadata: message.metadata.merge("link_preview" => preview))
-    message.broadcast_deletion_update
+    MessageUpdateBroadcastJob.perform_later(message_id)
   end
 
   private

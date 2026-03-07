@@ -24,7 +24,7 @@ class Conversation < ApplicationRecord
   }
 
   def last_message
-    messages.order(created_at: :desc).first
+    messages.order(sequence: :desc).first
   end
 
   # Última reação na conversa (para preview na lista: "Fulano curtiu 👍")

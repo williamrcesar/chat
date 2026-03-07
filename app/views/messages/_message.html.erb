@@ -1,7 +1,9 @@
 <% mine = message.sender_id == current_user.id %>
+<% client_msg_id = message.metadata.is_a?(Hash) && message.metadata["client_message_id"] %>
 
 <div id="<%= dom_id(message) %>"
-     class="flex <%= mine ? 'justify-end' : 'justify-start' %> group/msg px-2 min-w-0 <%= local_assigns[:first_in_list] ? '' : (local_assigns[:same_sender_as_previous] ? 'mt-0.5' : 'mt-1') %>">
+     class="flex <%= mine ? 'justify-end' : 'justify-start' %> group/msg px-2 min-w-0 <%= local_assigns[:first_in_list] ? '' : (local_assigns[:same_sender_as_previous] ? 'mt-0.5' : 'mt-1') %>"
+     <% if client_msg_id.present? %>data-client-message-id="<%= client_msg_id %>"<% end %>>
 
   <div class="max-w-[min(65%,22rem)] min-w-0 relative flex flex-col w-full">
 
@@ -299,13 +301,17 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#53bdeb] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
               </span>
             <% elsif message.status_delivered? %>
-              <span class="inline-flex -ml-0.5" aria-label="Entregue">
+              <span class="inline-flex -ml-0.5" aria-label="Entregue (cliente recebeu)">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
               </span>
-            <% else %>
-              <span class="inline-flex" aria-label="Enviado">
+            <% elsif message.status_sent? %>
+              <span class="inline-flex" aria-label="Enviado (não recebido ainda)">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% else %>
+              <span class="inline-flex" aria-label="Na fila (aguardando envio)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>
               </span>
             <% end %>
           <% end %>
@@ -314,14 +320,26 @@
           <div data-message-info-target="popover" class="hidden absolute bottom-full right-0 mb-1 z-20 min-w-[220px] max-w-[280px] bg-[#202c33] border border-[#2a3942] rounded-lg shadow-xl py-2 px-3 text-left">
             <p class="text-[#8696a0] text-xs font-medium uppercase tracking-wide mb-2">Informações da mensagem</p>
             <ul class="space-y-1.5 text-sm">
-              <li class="text-[#e9edef] flex items-center gap-2">
-                <span class="text-[#8696a0] w-16 flex-shrink-0">Enviado</span>
-                <span><%= message.created_at.strftime("%d/%m às %H:%M") %></span>
-              </li>
-              <% if message.status_delivered? || message.status_read? %>
+              <% if message.status_pending? %>
                 <li class="text-[#e9edef] flex items-center gap-2">
-                  <span class="text-[#8696a0] w-16 flex-shrink-0">Entregue</span>
-                  <span>✓</span>
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Na fila</span>
+                  <span>Aguardando envio (quando o destinatário abrir o app)</span>
+                </li>
+              <% end %>
+              <li class="text-[#e9edef] flex items-center gap-2">
+                <span class="text-[#8696a0] w-24 flex-shrink-0">Enviada</span>
+                <span><%= (message.sent_at || message.created_at).strftime("%d/%m às %H:%M") %></span>
+              </li>
+              <% if message.delivered_at %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Recebida</span>
+                  <span><%= message.delivered_at.strftime("%d/%m às %H:%M") %></span>
+                </li>
+              <% end %>
+              <% if message.read_at %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Lida</span>
+                  <span><%= message.read_at.strftime("%d/%m às %H:%M") %></span>
                 </li>
               <% end %>
               <% conv = message.conversation %>

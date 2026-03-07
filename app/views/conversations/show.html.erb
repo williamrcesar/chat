@@ -1,4 +1,8 @@
 <% content_for :title, @conversation.display_name_for(current_user) %>
+<%# Evita cache do Turbo nesta página: aba aberta há tempo sempre recebe conteúdo fresco e status atualizado %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
 
 <div class="flex h-screen bg-[#111b21]"
      data-controller="chat"
@@ -197,23 +201,28 @@
       <span id="typing-user-name"></span> está digitando...
     </div>
 
-    <%# Messages area — messagesTarget must be #messages so new messages append in correct order %>
-    <div class="flex-1 overflow-y-auto px-4 py-4"
-         id="messages-container"
-         style="background-color: #0b141a;">
+    <%# Messages area — sem turbo-permanent para ao clicar noutra conversa carregar as mensagens certas %>
+    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div class="flex-1 overflow-y-auto px-4 py-4 min-h-0"
+           id="messages-container"
+           data-controller="scroll-to-bottom"
+           data-action="turbo:load->scroll-to-bottom#scroll"
+           style="background-color: #0b141a;">
 
-      <%# Infinite scroll trigger (top) — shown when there are more pages %>
-      <% if @pagy.page < @pagy.pages %>
-        <%= render "messages/load_more",
-              conversation: @conversation,
-              next_page: @pagy.page + 1 %>
-      <% end %>
+        <%# Infinite scroll trigger (top) — shown when there are more pages %>
+        <% if @pagy.page < @pagy.pages %>
+          <%= render "messages/load_more",
+                conversation: @conversation,
+                next_page: @pagy.page + 1 %>
+        <% end %>
 
-      <div id="messages" data-chat-target="messages" class="min-w-0 flex flex-col">
+        <div id="messages" data-chat-target="messages" class="min-w-0 flex flex-col">
         <% prev_message = nil %>
         <% @messages.each do |message| %>
           <% if @first_unread_message_id == message.id %>
-            <div class="flex justify-center my-3" id="unread-divider">
+            <div class="flex justify-center my-3" id="unread-divider"
+                 data-controller="unread-divider"
+                 data-unread-divider-delay-ms-value="15000">
               <span class="bg-[#00a884] text-white text-xs font-medium px-4 py-1.5 rounded-full">
                 <%= @had_unread == 1 ? "1 mensagem não lida" : "#{@had_unread} mensagens não lidas" %>
               </span>
@@ -224,8 +233,9 @@
         <% end %>
       </div>
 
-      <%# Scroll anchor — JS scrolls here on load %>
-      <div id="messages-bottom"></div>
+        <%# Scroll anchor — JS scrolla até aqui ao carregar %>
+        <div id="messages-bottom"></div>
+      </div>
     </div>
 
     <%# Barra de seleção de imagens (modo "Selecionar mais") %>
@@ -268,6 +278,8 @@
                       action: "submit->chat#submitForm turbo:submit-end->chat#resetForm"
                     },
                     class: "flex items-end gap-2" do |f| %>
+        <%# client_message_id: um por envio; servidor usa para idempotência (evitar duplicata do mesmo envio) %>
+        <%= f.hidden_field :client_message_id, value: "", data: { chat_target: "clientMessageId" } %>
 
         <%# Emoji button — TODO %>
         <button type="button" class="p-2 text-[#8696a0] hover:text-white transition-colors flex-shrink-0 mb-1"
@@ -301,10 +313,11 @@
                 } %>
         </div>
 
-        <%# Send button %>
+        <%# Send button — chat#submitForm disables during submit to avoid double send %>
         <button type="submit"
                 data-chat-target="submitButton"
-                class="p-2 bg-[#00a884] hover:bg-[#02966f] text-white rounded-full transition-colors flex-shrink-0 mb-1">
+                class="p-2 bg-[#00a884] hover:bg-[#02966f] text-white rounded-full transition-colors flex-shrink-0 mb-1 disabled:opacity-70 disabled:cursor-not-allowed"
+                title="Enviar">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>

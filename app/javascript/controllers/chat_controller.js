@@ -2,11 +2,15 @@ import { Controller } from "@hotwired/stimulus"
 import { createConsumer } from "@rails/actioncable"
 
 export default class extends Controller {
-  static targets = ["messages", "input", "form", "submitButton", "attachment"]
+  static targets = ["messages", "input", "form", "submitButton", "attachment", "clientMessageId"]
   static values  = { conversationId: Number, interactiveLocked: Boolean }
 
   connect() {
     this.scrollToBottom()
+    // Repetir após o layout (imagens, etc.) para abrir a conversa já nas últimas mensagens
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => this.scrollToBottom())
+    })
     this.setupChannel()
     this.observeNewMessages()
     this.bindVisibility()
@@ -41,7 +45,10 @@ export default class extends Controller {
   handleReceived(data) {
     switch (data.type) {
       case "new_message":
-        this.appendMessage(data.message)
+        this.appendMessage(data.message, data.message_id)
+        if (data.message_id != null) {
+          this.channel.perform("message_received", { message_id: data.message_id })
+        }
         this.markRead()
         break
       case "typing":
@@ -51,10 +58,13 @@ export default class extends Controller {
         this.updatePresence(data)
         break
       case "message_updated":
-        if (data.turbo_stream) {
-          Turbo.renderStreamMessage(data.turbo_stream)
-        } else {
-          this.replaceMessage(data.message_id, data.html)
+        // Prefer direct replace by id when we have html so status (sent/delivered/read) updates reliably
+        const msgId = data.message_id ?? data["message_id"]
+        const html = data.html ?? data["html"]
+        if (msgId != null && html) {
+          this.replaceMessage(msgId, html)
+        } else if (data.turbo_stream || data["turbo_stream"]) {
+          Turbo.renderStreamMessage(data.turbo_stream || data["turbo_stream"])
         }
         break
       case "message_deleted":
@@ -73,8 +83,9 @@ export default class extends Controller {
     }
   }
 
-  appendMessage(html) {
+  appendMessage(html, messageId = null) {
     if (!this.hasMessagesTarget) return
+    if (messageId != null && document.getElementById(`message_${messageId}`)) return
     this.messagesTarget.insertAdjacentHTML("beforeend", html)
     this.scrollToBottom()
   }
@@ -82,17 +93,27 @@ export default class extends Controller {
   handleKeydown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
-      this.formTarget.requestSubmit()
+      if (!this._submitting) this.formTarget.requestSubmit()
     }
   }
 
-  submitForm() {
+  submitForm(event) {
+    if (this._submitting) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return
+    }
+    this._submitting = true
+    if (this.hasClientMessageIdTarget) {
+      this.clientMessageIdTarget.value = crypto.randomUUID()
+    }
     if (this.hasSubmitButtonTarget) {
       this.submitButtonTarget.disabled = true
     }
   }
 
   resetForm() {
+    this._submitting = false
     if (this.hasInputTarget) {
       this.inputTarget.value = ""
       this.inputTarget.style.height = "auto"
@@ -114,9 +135,13 @@ export default class extends Controller {
   }
 
   scrollToBottom() {
+    const container = document.getElementById("messages-container")
     const anchor = document.getElementById("messages-bottom")
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
     if (anchor) {
-      anchor.scrollIntoView({ behavior: "auto" })
+      anchor.scrollIntoView({ behavior: "auto", block: "end" })
     } else if (this.hasMessagesTarget) {
       this.messagesTarget.scrollTop = this.messagesTarget.scrollHeight
     }

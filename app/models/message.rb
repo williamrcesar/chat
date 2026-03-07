@@ -16,7 +16,8 @@ class Message < ApplicationRecord
     company_menu: 7
   }, prefix: :type
 
-  enum :status, { sent: 0, delivered: 1, read: 2 }, prefix: true
+  # pending = na fila; sent = enviada; delivered = recebida; read = lida
+  enum :status, { pending: 0, sent: 1, delivered: 2, read: 3 }, prefix: true
 
   validates :content, presence: true, if: -> { attachment.blank? && !deleted_for_everyone? }
   validates :message_type, presence: true
@@ -26,13 +27,13 @@ class Message < ApplicationRecord
     against: :content,
     using: { tsearch: { prefix: true, dictionary: "portuguese" } }
 
-  scope :visible,  -> { where(deleted_for_everyone: false) }
-  scope :recent,   -> { order(created_at: :asc) }
+  scope :visible,    -> { where(deleted_for_everyone: false) }
+  scope :recent,    -> { order(sequence: :asc) }
   scope :not_deleted, -> { where(deleted_at: nil) }
 
-  after_create_commit :broadcast_to_participants
-  after_create_commit :touch_conversation
-  after_destroy_commit :broadcast_deletion
+  before_create :set_sequence
+  after_create_commit  -> { MessageBroadcastJob.perform_later(id) }
+  after_destroy_commit -> { MessageDeletionBroadcastJob.perform_later(id, conversation_id) }
 
   def reactions_grouped
     reactions.group(:emoji).count
@@ -41,7 +42,7 @@ class Message < ApplicationRecord
   def soft_delete_for_everyone!
     update!(deleted_for_everyone: true, deleted_at: Time.current, content: nil)
     attachment.purge if attachment.attached?
-    broadcast_deletion_update
+    MessageUpdateBroadcastJob.perform_later(id)
   end
 
   def forwarded?
@@ -62,129 +63,39 @@ class Message < ApplicationRecord
     read_receipts.find { |rr| rr.user_id == user.id }
   end
 
-  # Atualiza para :read quando todos os destinatários (participantes que não são o remetente) têm ReadReceipt.
+  # Sequência única por conversa (1, 2, 3...) para ordem e referência sempre iguais
+  def set_sequence
+    return if sequence.present?
+    self.sequence = (conversation.messages.maximum(:sequence) || 0) + 1
+  end
+
+  # Status + data numa só tabela: enviada, recebida, lida, pendente
+  def mark_sent!
+    return if status_sent? || status_delivered? || status_read?
+    now = Time.current
+    update_columns(status: Message.statuses[:sent], sent_at: now)
+  end
+
+  def mark_delivered!
+    return if status_delivered? || status_read?
+    now = Time.current
+    update_columns(status: Message.statuses[:delivered], delivered_at: now)
+  end
+
+  def mark_read!
+    return if status_read?
+    now = Time.current
+    update_columns(status: Message.statuses[:read], read_at: now)
+  end
+
+  # Atualiza para :read quando todos os destinatários têm ReadReceipt; grava read_at
   def advance_to_read_if_receipts_complete!
     return if status_read?
     recipient_user_ids = conversation.participants.where.not(user_id: sender_id).pluck(:user_id)
     return if recipient_user_ids.empty?
     return unless read_receipts.where(user_id: recipient_user_ids).distinct.count >= recipient_user_ids.size
 
-    update_column(:status, Message.statuses[:read])
-    broadcast_deletion_update
-  end
-
-  # Público: chamado por LinkPreviewJob e por soft_delete_for_everyone!
-  def broadcast_deletion_update
-    reload
-    read_receipts.load
-    conversation.participants.includes(:user).load
-    conversation.participants.includes(:user).each do |participant|
-      html = ApplicationController.renderer.render(
-        partial: "messages/message",
-        locals: { message: self, current_user: participant.user }
-      )
-      stream = ApplicationController.helpers.turbo_stream.replace("message_#{id}", html)
-      ChatChannel.broadcast_to(
-        [ conversation, participant.user ],
-        { type: "message_updated", message_id: id, turbo_stream: stream.to_s, html: html }
-      )
-    end
-  end
-
-  private
-
-  def broadcast_to_participants
-    # Garantir que attachment/blob estão carregados para o HTML incluir a URL da imagem de imediato
-    reload
-    attachment.blob if attachment.attached?
-
-    conversation.participants.includes(:user).each do |participant|
-      # Sender already sees the message via turbo_stream response; only broadcast new_message to others
-      unless participant.user_id == sender_id
-        html = ApplicationController.renderer.render(
-          partial: "messages/message",
-          locals: { message: self, current_user: participant.user }
-        )
-        ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html })
-      end
-
-      # Update sidebar conversation list for all participants (unread badge + last message preview)
-      preview_html = ApplicationController.renderer.render(
-        partial: "conversations/conversation_item_preview",
-        locals:  { conversation: conversation, current_user: participant.user }
-      )
-      UserChannel.broadcast_to(participant.user, {
-        type:            "conversation_updated",
-        conversation_id: conversation.id,
-        preview_html:    preview_html
-      })
-
-      # Web Push for all recipients with subscription (skip sender).
-      next if participant.user_id == sender_id
-      next if participant.muted?
-      if participant.user.web_push_subscriptions.none?
-        Rails.logger.info("[WebPush] Skipped: user_id=#{participant.user_id} has no subscriptions (recipient must enable notifications in the app on that device)")
-        next
-      end
-
-      push_payload = build_push_payload_for(participant)
-      WebPushNotificationJob.perform_later(participant.user_id, push_payload)
-      Rails.logger.info("[WebPush] Enqueued push for user_id=#{participant.user_id} (see worker log for result)")
-    end
-
-    # Marcar como entregue e notificar o remetente (dois risquinhos cinza)
-    if status_sent? && conversation.participants.where.not(user_id: sender_id).exists?
-      update_column(:status, Message.statuses[:delivered])
-      broadcast_deletion_update
-    end
-  end
-
-  def build_push_payload_for(participant)
-    icon_url = Rails.application.routes.url_helpers.notification_icon_url(
-      token: participant.notification_icon_token
-    )
-    sound = if participant.notification_sound_file.attached?
-              Rails.application.routes.url_helpers.rails_blob_url(participant.notification_sound_file)
-            else
-              NotificationPreferences.sound_path(participant.effective_notification_sound).presence || NotificationPreferences.sound_path("default")
-            end
-    {
-      title:   sender.display_name,
-      body:    push_body,
-      icon:    icon_url,
-      badge:   "/icon.png",
-      sound:   sound,
-      color:   participant.effective_notification_color.presence,
-      data:    { path: "/conversations/#{conversation_id}" }
-    }.compact
-  end
-
-  def push_body
-    if attachment.attached?
-      base = case
-             when image?    then "sent you an image"
-             when audio?    then "sent you an audio"
-             when video?    then "sent you a video"
-             when document? then "sent you a document"
-             else "sent you a file"
-             end
-      base += ": #{content.to_s.truncate(80)}" if content.present?
-      base
-    else
-      content.to_s.truncate(120)
-    end
-  end
-
-  def touch_conversation
-    conversation.touch
-  end
-
-  def broadcast_deletion
-    conversation.participants.includes(:user).each do |participant|
-      ChatChannel.broadcast_to(
-        [ conversation, participant.user ],
-        { type: "message_deleted", message_id: id }
-      )
-    end
+    self.mark_read!
+    MessageUpdateBroadcastJob.perform_now(id)
   end
 end

@@ -40,6 +40,7 @@ class SendCampaignJob < ApplicationJob
 
         delivery.advance_to!(:sent, delivered_at: Time.current)
         delivery.update!(message: msg)
+        msg.mark_sent!
 
         # Set interactive lock on recipient if template has buttons/lists
         if template.interactive?

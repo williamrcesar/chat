@@ -19,17 +19,26 @@ class Participant < ApplicationRecord
 
   def mark_read!
     now = Time.current
+    previous_last_read = last_read_at
     update!(last_read_at: now)
-    # Criar ReadReceipts para mensagens não lidas (para os ícones enviado/entregue/lido)
-    conversation.messages
+
+    # Só processar mensagens do outro desde o último mark_read (evita centenas de queries em conversas longas)
+    scope = conversation.messages
       .where("created_at <= ?", now)
       .where.not(sender_id: user_id)
-      .find_each do |msg|
-        next if msg.read_receipts.exists?(user_id: user_id)
+    scope = scope.where("created_at > ?", previous_last_read) if previous_last_read.present?
+    message_ids = scope.limit(1000).pluck(:id)
+    return if message_ids.empty?
 
-        ReadReceipt.find_or_create_by!(message: msg, user: user) { |rr| rr.read_at = now }
-        msg.advance_to_read_if_receipts_complete!
-      end
+    # Uma query para saber quais já têm read_receipt deste usuário (em vez de N exists?)
+    existing_receipt_message_ids = ReadReceipt.where(message_id: message_ids, user_id: user_id).pluck(:message_id)
+    ids_without_receipt = message_ids - existing_receipt_message_ids
+    return if ids_without_receipt.empty?
+
+    Message.where(id: ids_without_receipt).find_each do |msg|
+      ReadReceipt.find_or_create_by!(message: msg, user: user) { |rr| rr.read_at = now }
+      msg.advance_to_read_if_receipts_complete!
+    end
   end
 
   def archive!

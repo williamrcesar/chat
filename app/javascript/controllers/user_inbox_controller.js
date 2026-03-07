@@ -24,8 +24,9 @@ export default class extends Controller {
   }
 
   handleReceived(data) {
-    if (data.type !== "conversation_updated" || !data.conversation_id || !data.preview_html) return
-    const el = document.getElementById(`conversation-preview-${data.conversation_id}`)
+    if (data.type !== "conversation_updated" || data.conversation_id == null || !data.preview_html) return
+    const id = `conversation-preview-${String(data.conversation_id)}`
+    const el = document.getElementById(id)
     if (el) el.outerHTML = data.preview_html
   }
 }

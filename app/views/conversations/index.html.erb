@@ -1,4 +1,7 @@
 <% content_for :title, "Chat" %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
 
 <div class="flex h-screen bg-[#111b21]" data-controller="presence contact-requests new-conversation">
 

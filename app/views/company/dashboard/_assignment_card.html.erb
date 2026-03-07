@@ -41,7 +41,7 @@
     </p>
   <% end %>
 
-  <% last_msg = conv.messages.order(created_at: :desc).first %>
+  <% last_msg = conv.messages.order(sequence: :desc).first %>
   <% if last_msg %>
     <p class="text-[#8696a0] text-xs mt-1 truncate">"<%= last_msg.content&.truncate(50) %>"</p>
   <% end %>

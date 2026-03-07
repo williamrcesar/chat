@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_07_000001) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -186,6 +186,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_07_000001) do
     t.bigint "forwarded_from_id"
     t.boolean "message_type_marketing", default: false, null: false
     t.bigint "campaign_delivery_id"
+    t.integer "sequence", null: false
+    t.datetime "sent_at"
+    t.datetime "delivered_at"
+    t.datetime "read_at"
+    t.index ["conversation_id", "sequence"], name: "index_messages_on_conversation_id_and_sequence", unique: true
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["created_at"], name: "index_messages_on_created_at"
     t.index ["deleted_at"], name: "index_messages_on_deleted_at"
