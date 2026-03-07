@@ -1,5 +1,10 @@
-<%# Template builder form — shared between new and edit %>
-<%= form_with model: [:marketing, template], multipart: true,
+<%# Template builder form — shared between new and edit.
+    URL must be explicit: model is MarketingTemplate, so form_with model: [:marketing, template]
+    would generate marketing_marketing_templates_path (invalid). Routes are marketing_templates_path
+    and marketing_template_path(template). %>
+<%= form_with model: template,
+      url: template.persisted? ? marketing_template_path(template) : marketing_templates_path,
+      multipart: true,
       data: { controller: "template-builder" },
       class: "grid grid-cols-1 lg:grid-cols-2 gap-8" do |f| %>
 

@@ -11,7 +11,18 @@ class Participant < ApplicationRecord
   scope :archived, -> { where(archived: true) }
 
   def mark_read!
-    update!(last_read_at: Time.current)
+    now = Time.current
+    update!(last_read_at: now)
+    # Criar ReadReceipts para mensagens não lidas (para os ícones enviado/entregue/lido)
+    conversation.messages
+      .where("created_at <= ?", now)
+      .where.not(sender_id: user_id)
+      .find_each do |msg|
+        next if msg.read_receipts.exists?(user_id: user_id)
+
+        ReadReceipt.find_or_create_by!(message: msg, user: user) { |rr| rr.read_at = now }
+        msg.advance_to_read_if_receipts_complete!
+      end
   end
 
   def archive!

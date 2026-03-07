@@ -16,7 +16,7 @@
 
   <div>
     <%= f.label :category, "Categoria", class: "block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide" %>
-    <%= f.select :category, Template::CATEGORIES,
+    <%= f.select :category, ::Template::CATEGORIES,
           {},
           class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors" %>
   </div>

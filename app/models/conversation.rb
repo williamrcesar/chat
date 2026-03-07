@@ -27,6 +27,23 @@ class Conversation < ApplicationRecord
     messages.order(created_at: :desc).first
   end
 
+  # Última reação na conversa (para preview na lista: "Fulano curtiu 👍")
+  def last_reaction
+    MessageReaction.joins(:message).includes(:user)
+      .where(messages: { conversation_id: id })
+      .order("message_reactions.created_at DESC")
+      .first
+  end
+
+  # Se a última atividade foi uma reação (mais recente que a última mensagem), retorna { type: :reaction, user_name:, emoji: }; senão nil (mostrar última mensagem).
+  def last_activity_reaction_for_preview
+    msg = last_message
+    react = last_reaction
+    return nil unless react && msg
+    return nil if react.created_at <= msg.created_at
+    { type: :reaction, user_name: react.user.display_name, emoji: react.emoji }
+  end
+
   def unread_count_for(user)
     participant = participants.find_by(user: user)
     return 0 unless participant
@@ -46,10 +63,18 @@ class Conversation < ApplicationRecord
     users.where.not(id: current_user.id).first
   end
 
+  # Returns the single direct conversation between two users, or creates it.
+  # Uses a single DB query to avoid duplicates and N+1.
   def self.find_or_create_direct(user_a, user_b)
-    existing = where(conversation_type: :direct).select do |c|
-      c.users.pluck(:id).sort == [ user_a.id, user_b.id ].sort
-    end.first
+    return find_or_create_direct(user_b, user_a) if user_a.id > user_b.id
+
+    existing = joins(:participants)
+      .where(conversation_type: :direct)
+      .where(participants: { user_id: [ user_a.id, user_b.id ] })
+      .where.not(is_company_conversation: true)
+      .group(:id)
+      .having("COUNT(participants.id) = 2")
+      .first
     return existing if existing
 
     transaction do

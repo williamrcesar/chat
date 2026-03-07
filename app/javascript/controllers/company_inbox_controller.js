@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import consumer from "channels/consumer"
+import { createConsumer } from "@rails/actioncable"
 
 // Manages the live company dashboard inbox.
 // Subscribes to CompanyChannel and updates attendant status cards and
@@ -31,6 +31,7 @@ export default class extends Controller {
 
   _subscribe() {
     const companyId = this.companyIdValue
+    const consumer = createConsumer()
     this.subscription = consumer.subscriptions.create(
       { channel: "CompanyChannel", company_id: companyId },
       { received: (data) => this._handleReceived(data) }

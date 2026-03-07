@@ -39,6 +39,9 @@ gem "blueprinter"
 # Full-text search
 gem "pg_search"
 
+# Markdown em mensagens
+gem "redcarpet"
+
 # CORS for API
 gem "rack-cors"
 

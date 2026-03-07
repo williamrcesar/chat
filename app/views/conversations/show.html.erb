@@ -83,13 +83,20 @@
         </div>
       <% else %>
         <% other = @conversation.other_user(current_user) %>
-        <div class="w-10 h-10 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold flex-shrink-0"
+        <div class="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center bg-[#6a7175]"
              id="contact-presence-avatar">
-          <%= other&.display_name&.first&.upcase || "?" %>
+          <% if other&.avatar&.attached? %>
+            <%= image_tag other.avatar, class: "w-full h-full object-cover", alt: other.display_name %>
+          <% else %>
+            <span class="text-white font-semibold text-sm"><%= other&.display_name&.first&.upcase || "?" %></span>
+          <% end %>
         </div>
       <% end %>
 
       <div class="flex-1 min-w-0">
+        <% if @had_unread.to_i > 0 %>
+          <p class="text-[#00a884] text-xs font-medium mb-0.5"><%= @had_unread == 1 ? "1 mensagem não lida" : "#{@had_unread} mensagens não lidas" %></p>
+        <% end %>
         <h2 class="text-white font-medium text-sm"><%= @conversation.display_name_for(current_user) %></h2>
         <p class="text-[#8696a0] text-xs" id="contact-status">
           <% if @conversation.conversation_type_direct? %>
@@ -181,10 +188,9 @@
       <span id="typing-user-name"></span> está digitando...
     </div>
 
-    <%# Messages area %>
-    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+    <%# Messages area — messagesTarget must be #messages so new messages append in correct order %>
+    <div class="flex-1 overflow-y-auto px-4 py-4"
          id="messages-container"
-         data-chat-target="messages"
          style="background-color: #0b141a;">
 
       <%# Infinite scroll trigger (top) — shown when there are more pages %>
@@ -194,9 +200,18 @@
               next_page: @pagy.page + 1 %>
       <% end %>
 
-      <div id="messages">
+      <div id="messages" data-chat-target="messages" class="min-w-0 flex flex-col">
+        <% prev_message = nil %>
         <% @messages.each do |message| %>
-          <%= render "messages/message", message: message, current_user: current_user %>
+          <% if @first_unread_message_id == message.id %>
+            <div class="flex justify-center my-3" id="unread-divider">
+              <span class="bg-[#00a884] text-white text-xs font-medium px-4 py-1.5 rounded-full">
+                <%= @had_unread == 1 ? "1 mensagem não lida" : "#{@had_unread} mensagens não lidas" %>
+              </span>
+            </div>
+          <% end %>
+          <%= render "messages/message", message: message, current_user: current_user, same_sender_as_previous: (prev_message && prev_message.sender_id == message.sender_id), first_in_list: prev_message.nil? %>
+          <% prev_message = message %>
         <% end %>
       </div>
 
@@ -204,20 +219,40 @@
       <div id="messages-bottom"></div>
     </div>
 
-    <%# Message input area %>
-    <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942]">
+    <%# Barra de seleção de imagens (modo "Selecionar mais") %>
+    <div id="image-selection-bar"
+         data-controller="image-selection-bar"
+         class="hidden fixed bottom-20 left-0 md:left-[400px] right-0 z-50 flex justify-center py-3 bg-[#202c33] border-t border-[#2a3942] shadow-lg">
+      <div class="flex items-center gap-4">
+        <span class="text-[#d1d7db] text-sm" data-image-selection-bar-target="count">0 imagens selecionadas</span>
+        <button type="button"
+                data-action="click->image-selection-bar#downloadSelected"
+                class="px-4 py-2 rounded-lg bg-[#00a884] text-white hover:bg-[#02966f] transition-colors text-sm font-medium">
+          Descarregar seleção
+        </button>
+        <button type="button"
+                data-action="click->image-selection-bar#cancel"
+                class="px-4 py-2 rounded-lg bg-[#2a3942] text-[#d1d7db] hover:bg-[#3d4a52] transition-colors text-sm">
+          Cancelar
+        </button>
+      </div>
+    </div>
+
+    <%# Message input area — file-preview controller must wrap the input for change->file-preview#showPreview %>
+    <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942]" data-controller="file-preview">
 
       <%# File preview %>
-      <div id="file-preview" class="hidden mb-3 p-3 bg-[#2a3942] rounded-lg flex items-center gap-3">
-        <div id="file-preview-content" class="flex-1"></div>
-        <button id="file-preview-remove" class="text-[#8696a0] hover:text-white">
+      <div id="file-preview" class="hidden mb-3 p-3 bg-[#2a3942] rounded-lg flex flex-wrap items-center gap-3">
+        <div id="file-preview-content" class="flex-1 flex flex-wrap gap-3 min-w-0"></div>
+        <button type="button" id="file-preview-remove" class="text-[#8696a0] hover:text-white flex-shrink-0" title="Remover anexos">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <%= form_with url: conversation_messages_path(@conversation),
+      <%= form_with scope: :message,
+                    url: conversation_messages_path(@conversation, format: :turbo_stream),
                     method: :post,
                     data: {
                       chat_target: "form",
@@ -241,7 +276,8 @@
           </svg>
           <%= f.file_field :attachment, class: "hidden",
                 data: { action: "change->file-preview#showPreview", chat_target: "attachment" },
-                accept: "image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" %>
+                accept: "image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip",
+                multiple: true %>
         </label>
 
         <%# Text input %>

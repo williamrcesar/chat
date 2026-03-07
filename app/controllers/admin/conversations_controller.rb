@@ -6,7 +6,7 @@ module Admin
       @pagy, @conversations = pagy(
         Conversation.includes(:participants, :messages)
                     .order(updated_at: :desc),
-        items: 25
+        limit: 25
       )
     end
 

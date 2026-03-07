@@ -58,15 +58,66 @@ class Message < ApplicationRecord
   def video?    = type_video?    || (attachment.attached? && attachment.content_type.start_with?("video/"))
   def document? = type_document? || (attachment.attached? && !image? && !audio? && !video?)
 
-  private
+  def read_receipt_for(user)
+    read_receipts.find { |rr| rr.user_id == user.id }
+  end
 
-  def broadcast_to_participants
+  # Atualiza para :read quando todos os destinatários (participantes que não são o remetente) têm ReadReceipt.
+  def advance_to_read_if_receipts_complete!
+    return if status_read?
+    recipient_user_ids = conversation.participants.where.not(user_id: sender_id).pluck(:user_id)
+    return if recipient_user_ids.empty?
+    return unless read_receipts.where(user_id: recipient_user_ids).distinct.count >= recipient_user_ids.size
+
+    update_column(:status, Message.statuses[:read])
+    broadcast_deletion_update
+  end
+
+  # Público: chamado por LinkPreviewJob e por soft_delete_for_everyone!
+  def broadcast_deletion_update
+    reload
+    read_receipts.load
+    conversation.participants.includes(:user).load
     conversation.participants.includes(:user).each do |participant|
       html = ApplicationController.renderer.render(
         partial: "messages/message",
         locals: { message: self, current_user: participant.user }
       )
-      ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html })
+      stream = ApplicationController.helpers.turbo_stream.replace("message_#{id}", html)
+      ChatChannel.broadcast_to(
+        [ conversation, participant.user ],
+        { type: "message_updated", message_id: id, turbo_stream: stream.to_s, html: html }
+      )
+    end
+  end
+
+  private
+
+  def broadcast_to_participants
+    # Garantir que attachment/blob estão carregados para o HTML incluir a URL da imagem de imediato
+    reload
+    attachment.blob if attachment.attached?
+
+    conversation.participants.includes(:user).each do |participant|
+      # Sender already sees the message via turbo_stream response; only broadcast new_message to others
+      unless participant.user_id == sender_id
+        html = ApplicationController.renderer.render(
+          partial: "messages/message",
+          locals: { message: self, current_user: participant.user }
+        )
+        ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html })
+      end
+
+      # Update sidebar conversation list for all participants (unread badge + last message preview)
+      preview_html = ApplicationController.renderer.render(
+        partial: "conversations/conversation_item_preview",
+        locals:  { conversation: conversation, current_user: participant.user }
+      )
+      UserChannel.broadcast_to(participant.user, {
+        type:            "conversation_updated",
+        conversation_id: conversation.id,
+        preview_html:    preview_html
+      })
 
       # Push notification for offline recipients only (skip sender)
       next if participant.user_id == sender_id
@@ -81,6 +132,12 @@ class Message < ApplicationRecord
         data:    { path: "/conversations/#{conversation_id}" }
       }
       WebPushNotificationJob.perform_later(participant.user_id, push_payload)
+    end
+
+    # Marcar como entregue e notificar o remetente (dois risquinhos cinza)
+    if status_sent? && conversation.participants.where.not(user_id: sender_id).exists?
+      update_column(:status, Message.statuses[:delivered])
+      broadcast_deletion_update
     end
   end
 
@@ -101,20 +158,6 @@ class Message < ApplicationRecord
       ChatChannel.broadcast_to(
         [ conversation, participant.user ],
         { type: "message_deleted", message_id: id }
-      )
-    end
-  end
-
-  def broadcast_deletion_update
-    html_by_user = {}
-    conversation.participants.includes(:user).each do |participant|
-      html = ApplicationController.renderer.render(
-        partial: "messages/message",
-        locals: { message: self, current_user: participant.user }
-      )
-      ChatChannel.broadcast_to(
-        [ conversation, participant.user ],
-        { type: "message_updated", message_id: id, html: html }
       )
     end
   end

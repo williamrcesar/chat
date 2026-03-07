@@ -38,26 +38,7 @@
           </span>
         <% end %>
       </div>
-      <div class="flex items-center justify-between mt-0.5">
-        <span class="text-[#8696a0] text-xs truncate">
-          <% if (last = conversation.last_message) %>
-            <% if last.sender == current_user %>
-              <svg xmlns="http://www.w3.org/2000/svg" class="inline h-3 w-3 text-[#53bdeb] mr-0.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-            <% end %>
-            <%= last.type_image? ? "📷 Foto" : last.type_audio? ? "🎤 Áudio" : last.type_video? ? "🎥 Vídeo" : last.type_document? ? "📄 Documento" : last.content&.truncate(40) %>
-          <% else %>
-            Nenhuma mensagem
-          <% end %>
-        </span>
-        <% unread = conversation.unread_count_for(current_user) %>
-        <% if unread > 0 %>
-          <span class="bg-[#00a884] text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center px-1 ml-1 flex-shrink-0">
-            <%= unread %>
-          </span>
-        <% end %>
-      </div>
+      <%= render "conversations/conversation_item_preview", conversation: conversation, current_user: current_user %>
     </div>
   <% end %>
 </div>

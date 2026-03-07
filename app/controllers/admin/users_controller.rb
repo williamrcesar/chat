@@ -5,14 +5,14 @@ module Admin
     def index
       @pagy, @users = pagy(
         User.order(created_at: :desc),
-        items: 25
+        limit: 25
       )
       @q = params[:q]
       if @q.present?
         @pagy, @users = pagy(
           User.where("display_name ILIKE ? OR email ILIKE ?", "%#{@q}%", "%#{@q}%")
               .order(created_at: :desc),
-          items: 25
+          limit: 25
         )
       end
     end

@@ -1,0 +1,135 @@
+# Locale pt-BR para a aplicação e Devise
+# https://guides.rubyonrails.org/i18n.html
+
+pt-BR:
+  hello: "Olá mundo"
+
+  activerecord:
+    errors:
+      models:
+        user:
+          attributes:
+            email:
+              taken: "já está em uso"
+            nickname:
+              taken: "já está em uso"
+      messages:
+        taken: "já está em uso"
+        blank: "não pode ficar em branco"
+        confirmation: "não é igual à confirmação"
+        empty: "não pode ficar vazio"
+        exclusion: "não está disponível"
+        inclusion: "não está incluído na lista"
+        invalid: "não é válido"
+        not_a_number: "não é um número"
+        not_an_integer: "não é um número inteiro"
+        required: "é obrigatório"
+        too_long:
+          one: "é muito longo (máximo 1 caractere)"
+          other: "é muito longo (máximo %{count} caracteres)"
+        too_short:
+          one: "é muito curto (mínimo 1 caractere)"
+          other: "é muito curto (mínimo %{count} caracteres)"
+        wrong_length:
+          one: "não possui o tamanho esperado (1 caractere)"
+          other: "não possui o tamanho esperado (%{count} caracteres)"
+
+  datetime:
+    distance_in_words:
+      half_a_minute: "meio minuto"
+      less_than_x_seconds:
+        one: "menos de 1 segundo"
+        other: "menos de %{count} segundos"
+      x_seconds:
+        one: "1 segundo"
+        other: "%{count} segundos"
+      less_than_x_minutes:
+        one: "menos de um minuto"
+        other: "menos de %{count} minutos"
+      x_minutes:
+        one: "1 minuto"
+        other: "%{count} minutos"
+      about_x_hours:
+        one: "cerca de 1 hora"
+        other: "cerca de %{count} horas"
+      x_days:
+        one: "1 dia"
+        other: "%{count} dias"
+      about_x_months:
+        one: "cerca de 1 mês"
+        other: "cerca de %{count} meses"
+      x_months:
+        one: "1 mês"
+        other: "%{count} meses"
+      about_x_years:
+        one: "cerca de 1 ano"
+        other: "cerca de %{count} anos"
+      over_x_years:
+        one: "mais de 1 ano"
+        other: "mais de %{count} anos"
+      almost_x_years:
+        one: "quase 1 ano"
+        other: "quase %{count} anos"
+
+  devise:
+    confirmations:
+      confirmed: "Sua conta foi confirmada com sucesso."
+      send_instructions: "Você receberá um e-mail com instruções para confirmar sua conta em alguns minutos."
+      send_paranoid_instructions: "Se seu e-mail existir em nossa base de dados, você receberá um e-mail com instruções para recuperar sua conta."
+    failure:
+      already_authenticated: "Você já está autenticado."
+      inactive: "Sua conta ainda não foi ativada."
+      invalid: "E-mail ou senha inválidos."
+      last_attempt_failed: "Você tem mais uma tentativa antes de sua conta ser bloqueada."
+      locked: "Sua conta está bloqueada devido ao número máximo de tentativas sem sucesso."
+      not_found_in_database: "E-mail ou senha inválidos."
+      timeout: "Sua sessão expirou. Por favor, faça login novamente."
+      unauthenticated: "Você precisa fazer login ou se cadastrar para continuar."
+      unconfirmed: "Você precisa confirmar sua conta para continuar."
+    mailer:
+      confirmation_instructions:
+        subject: "Instruções de confirmação"
+      reset_password_instructions:
+        subject: "Instruções para redefinir sua senha"
+      unlock_instructions:
+        subject: "Instruções para desbloquear sua conta"
+      email_changed:
+        subject: "Seu e-mail foi alterado"
+      password_change:
+        subject: "Sua senha foi alterada"
+    omniauth_callbacks:
+      failure: "Não foi possível autenticar você via %{kind}: %{reason}."
+      success: "Autenticado com sucesso via %{kind}."
+    passwords:
+      no_token: "Você não pode acessar esta página sem vir de um e-mail de redefinição de senha. Se você veio de um desses e-mails, certifique-se de usar a URL completa."
+      send_instructions: "Você receberá um e-mail com instruções para redefinir sua senha em alguns minutos."
+      send_paranoid_instructions: "Se seu e-mail existir em nossa base de dados, você receberá um e-mail com instruções para recuperar sua conta."
+      updated: "Sua senha foi alterada com sucesso. Agora você está conectado."
+      updated_not_active: "Sua senha foi alterada com sucesso."
+    registrations:
+      destroyed: "Adeus! Sua conta foi cancelada com sucesso."
+      signed_up: "Bem-vindo! Sua conta foi criada com sucesso."
+      signed_up_but_inactive: "Você se cadastrou com sucesso. No entanto, não foi possível fazer login porque sua conta ainda não está ativada."
+      signed_up_but_locked: "Você se cadastrou com sucesso. No entanto, não foi possível fazer login porque sua conta está bloqueada."
+      signed_up_but_unconfirmed: "Uma mensagem com um link de confirmação foi enviada para seu e-mail. Abra o link para ativar sua conta."
+      update_needs_confirmation: "Você atualizou sua conta com sucesso, mas precisamos verificar seu novo endereço de e-mail. Enviamos um e-mail com um link de confirmação para o novo endereço."
+      updated: "Sua conta foi atualizada com sucesso."
+      updated_but_not_signed_in: "Sua conta foi atualizada com sucesso, mas como sua senha foi alterada, você precisa fazer login novamente."
+    sessions:
+      signed_in: "Login realizado com sucesso."
+      signed_out: "Logout realizado com sucesso."
+      already_signed_out: "Logout realizado com sucesso."
+    unlock_mailer:
+      unlock_instructions:
+        subject: "Instruções para desbloquear sua conta"
+    validations:
+      already_taken: "já está em uso"
+      confirmation: "não confere com a confirmação"
+      expired: "expirou. Solicite uma nova"
+      invalid: "não é válido"
+      not_confirmable: "não pode ser confirmado. Tente enviar novamente"
+      not_found: "não encontrado"
+      not_locked: "não estava bloqueado"
+      not_saved:
+        one: "1 erro impediu que %{resource} fosse salvo:"
+        other: "%{count} erros impediram que %{resource} fosse salvo:"

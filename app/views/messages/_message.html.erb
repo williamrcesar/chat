@@ -1,12 +1,12 @@
 <% mine = message.sender_id == current_user.id %>
 
 <div id="<%= dom_id(message) %>"
-     class="flex <%= mine ? 'justify-end' : 'justify-start' %> mb-1 group/msg px-2">
+     class="flex <%= mine ? 'justify-end' : 'justify-start' %> group/msg px-2 min-w-0 <%= local_assigns[:first_in_list] ? '' : (local_assigns[:same_sender_as_previous] ? 'mt-0.5' : 'mt-1') %>">
 
-  <div class="max-w-[65%] relative">
+  <div class="max-w-[min(65%,22rem)] min-w-0 relative flex flex-col w-full">
 
-    <%# Context menu (hover actions) %>
-    <div class="absolute <%= mine ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2' %> top-0 hidden group-hover/msg:flex items-center gap-1 z-10">
+    <%# Context menu (hover actions); .emoji-picker-open keeps it visible while picker is open %>
+    <div class="context-menu-bar absolute <%= mine ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2' %> top-0 hidden group-hover/msg:flex items-center gap-1 z-10">
 
       <%# Emoji reaction picker %>
       <div class="relative" data-controller="emoji-picker">
@@ -16,10 +16,10 @@
         <div data-emoji-picker-target="panel"
              class="hidden absolute bottom-8 <%= mine ? 'right-0' : 'left-0' %> bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex gap-1 z-20">
           <% MessageReaction::ALLOWED_EMOJIS.each do |emoji| %>
-            <%= button_to message_reaction_path(@conversation || message.conversation, message_id: message.id),
+            <%= button_to conversation_message_reaction_path(@conversation || message.conversation, message_id: message.id, format: :turbo_stream),
                   params: { emoji: emoji },
                   method: :post,
-                  form: { data: { turbo: false } },
+                  form: { data: { turbo: true } },
                   class: "text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-[#2a3942]" do %>
               <%= emoji %>
             <% end %>
@@ -54,7 +54,7 @@
     </div>
 
     <%# Message bubble %>
-    <div class="<%= mine ? 'bg-[#005c4b]' : 'bg-[#202c33]' %> rounded-lg px-3 py-2 shadow-sm">
+    <div class="<%= mine ? 'bg-[#005c4b]' : 'bg-[#202c33]' %> rounded-lg px-3 py-2 shadow-sm min-w-0 overflow-hidden">
 
       <%# Sender name (group chats) %>
       <% if !mine %>
@@ -94,7 +94,20 @@
         <%# Attachments %>
         <% if message.attachment.attached? %>
           <% if message.image? %>
-            <%= image_tag message.attachment, class: "rounded-md max-w-full max-h-64 object-cover mb-1" %>
+            <div class="mb-1 rounded-md overflow-hidden min-h-[120px] bg-black/20 relative"
+                 data-controller="image-viewer"
+                 data-image-viewer-url-value="<%= rails_blob_path(message.attachment) %>"
+                 data-image-viewer-filename-value="<%= message.attachment.filename %>"
+                 data-action="click->image-viewer#open">
+              <input type="checkbox"
+                     data-image-viewer-target="checkbox"
+                     class="image-viewer-checkbox absolute top-2 left-2 z-10 w-5 h-5 rounded border-2 border-white bg-black/50 text-[#00a884] focus:ring-0 hidden">
+              <img src="<%= rails_blob_path(message.attachment) %>"
+                   alt="<%= message.attachment.filename %>"
+                   class="rounded-md max-w-full max-h-64 w-full object-contain cursor-pointer block"
+                   loading="lazy"
+                   data-image-viewer-target="img">
+            </div>
           <% elsif message.video? %>
             <video controls class="rounded-md max-w-full max-h-64 mb-1">
               <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
@@ -114,9 +127,37 @@
           <% end %>
         <% end %>
 
-        <%# Text content %>
+        <%# Link preview: card clicável com ou sem imagem (sempre que houver URL no metadata) %>
+        <% if message.metadata["link_preview"].present? %>
+          <% lp = message.metadata["link_preview"] %>
+          <a href="<%= lp["url"] %>" target="_blank" rel="noopener noreferrer" class="block mb-2 rounded-lg overflow-hidden border border-[#2a3942] hover:border-[#00a884]/50 transition-colors max-w-full w-full min-w-0">
+            <% if lp["image_url"].present? %>
+              <img src="<%= lp["image_url"] %>" alt="<%= lp["title"].to_s.truncate(60) %>" class="w-full max-h-48 object-cover">
+            <% end %>
+            <div class="p-2 bg-[#2a3942]/80 flex items-center gap-2 min-h-[2.5rem]">
+              <% if lp["title"].present? %>
+                <p class="text-[#e9edef] text-sm font-medium line-clamp-2 flex-1 min-w-0"><%= lp["title"] %></p>
+              <% end %>
+              <p class="text-[#8696a0] text-xs truncate flex-1 min-w-0"><%= lp["url"] %></p>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00a884] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </div>
+          </a>
+        <% end %>
+
+        <%# Text content (Markdown, limite de altura + "mostrar mais") %>
         <% if message.content.present? %>
-          <p class="text-[#e9edef] text-sm leading-relaxed whitespace-pre-wrap break-words"><%= message.content %></p>
+          <div class="message-text-wrapper w-full min-w-0 max-w-full" data-controller="message-expand">
+            <div data-message-expand-target="content" class="message-text-content text-[#e9edef] text-sm leading-relaxed break-words overflow-hidden max-h-40 transition-[max-height] duration-200">
+              <div class="prose-chat prose-chat-sm max-w-full">
+                <%= render_markdown(message.content) %>
+              </div>
+            </div>
+            <button type="button" data-message-expand-target="toggle" data-action="click->message-expand#toggle" class="hidden mt-0.5 text-[#00a884] hover:text-[#00d494] text-xs font-medium">
+              <span data-message-expand-target="label">mostrar mais</span>
+            </button>
+          </div>
         <% end %>
 
         <%# Company department menu %>
@@ -244,40 +285,81 @@
         <% end %>
       <% end %>
 
-      <%# Timestamp + status %>
-      <div class="flex items-center justify-end gap-1 mt-1">
-        <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
-        <% if mine && !message.deleted_for_everyone? %>
-          <% if message.status_read? %>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#53bdeb]" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
-          <% else %>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
+      <%# Timestamp + status — clicável para ver detalhes (enviado/entregue/lido) %>
+      <div class="flex items-center justify-end gap-1 mt-1 relative" data-controller="message-info">
+        <button type="button" data-action="click->message-info#toggle" data-message-info-target="trigger"
+                class="flex items-center gap-1 rounded px-1 -mr-1 <%= (mine && !message.deleted_for_everyone?) ? 'cursor-pointer hover:bg-white/5' : 'cursor-default' %> transition-colors"
+                <%= "disabled" unless mine && !message.deleted_for_everyone? %>
+                title="<%= (mine && !message.deleted_for_everyone?) ? 'Ver informações da mensagem' : '' %>">
+          <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
+          <% if mine && !message.deleted_for_everyone? %>
+            <% if message.status_read? %>
+              <span class="inline-flex -ml-0.5" aria-label="Lido">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#53bdeb]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#53bdeb] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% elsif message.status_delivered? %>
+              <span class="inline-flex -ml-0.5" aria-label="Entregue">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% else %>
+              <span class="inline-flex" aria-label="Enviado">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% end %>
           <% end %>
+        </button>
+        <% if mine && !message.deleted_for_everyone? %>
+          <div data-message-info-target="popover" class="hidden absolute bottom-full right-0 mb-1 z-20 min-w-[220px] max-w-[280px] bg-[#202c33] border border-[#2a3942] rounded-lg shadow-xl py-2 px-3 text-left">
+            <p class="text-[#8696a0] text-xs font-medium uppercase tracking-wide mb-2">Informações da mensagem</p>
+            <ul class="space-y-1.5 text-sm">
+              <li class="text-[#e9edef] flex items-center gap-2">
+                <span class="text-[#8696a0] w-16 flex-shrink-0">Enviado</span>
+                <span><%= message.created_at.strftime("%d/%m às %H:%M") %></span>
+              </li>
+              <% if message.status_delivered? || message.status_read? %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-16 flex-shrink-0">Entregue</span>
+                  <span>✓</span>
+                </li>
+              <% end %>
+              <% conv = message.conversation %>
+              <% recipients = conv.participants.includes(:user).reject { |p| p.user_id == message.sender_id } %>
+              <% if conv.conversation_type_group? %>
+                <% recipients.each do |participant| %>
+                  <% rr = message.read_receipt_for(participant.user) %>
+                  <li class="text-[#e9edef] flex items-center justify-between gap-2">
+                    <span class="truncate"><%= participant.user.display_name %></span>
+                    <% if rr %>
+                      <span class="text-[#53bdeb] text-xs flex-shrink-0"><%= rr.read_at.strftime("%H:%M") %></span>
+                    <% else %>
+                      <span class="text-[#8696a0] text-xs flex-shrink-0">Não lido</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              <% else %>
+                <% other = recipients.first&.user %>
+                <% if other %>
+                  <li class="text-[#e9edef] flex items-center justify-between gap-2">
+                    <span class="text-[#8696a0] flex-shrink-0">Lido por <%= other.display_name %></span>
+                    <% rr = message.read_receipt_for(other) %>
+                    <% if rr %>
+                      <span class="text-[#53bdeb] text-xs"><%= rr.read_at.strftime("%d/%m às %H:%M") %></span>
+                    <% else %>
+                      <span class="text-[#8696a0] text-xs">Não lido</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              <% end %>
+            </ul>
+          </div>
         <% end %>
       </div>
     </div>
 
-    <%# Reactions bar (below the bubble) %>
-    <% grouped = message.reactions_grouped %>
-    <% if grouped.any? %>
-      <div id="reactions_<%= message.id %>"
-           class="flex flex-wrap gap-1 mt-1 <%= mine ? 'justify-end' : 'justify-start' %>">
-        <% grouped.each do |emoji, count| %>
-          <%= button_to message_reaction_path(message.conversation, message_id: message.id),
-                params: { emoji: emoji },
-                method: :post,
-                form: { data: { turbo: false } },
-                class: "flex items-center gap-0.5 bg-[#202c33] hover:bg-[#2a3942] border border-[#2a3942] rounded-full px-2 py-0.5 text-xs transition-colors" do %>
-            <span><%= emoji %></span>
-            <span class="text-[#8696a0]"><%= count %></span>
-          <% end %>
-        <% end %>
-      </div>
-    <% end %>
+    <%# Reactions bar (below the bubble) — always render wrapper so turbo_stream.replace works %>
+    <%= render "messages/message_reactions", message: message, current_user: current_user %>
 
   </div>
 </div>

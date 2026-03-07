@@ -3,24 +3,51 @@ class MessagesController < ApplicationController
   before_action :set_message, only: %i[ delete_for_everyone ]
 
   def create
-    @message = @conversation.messages.build(message_params)
-    @message.sender = current_user
+    raw = Array(params.dig(:message, :attachment)).compact_blank
+    attachments = raw.select { |a| a.respond_to?(:tempfile) && a.tempfile.present? }
+    content = message_params[:content].presence
 
-    if params[:message][:attachment].present?
-      @message.attachment.attach(params[:message][:attachment])
-      @message.message_type = detect_message_type(params[:message][:attachment])
-    end
-
-    authorize @message
-
-    if @message.save
-      @conversation.participants.find_by(user: current_user)&.mark_read!
-      respond_to do |format|
-        format.turbo_stream
-        format.html { redirect_to conversation_path(@conversation) }
+    if attachments.size > 1
+      # Vários anexos: uma mensagem por arquivo (primeira pode ter texto)
+      base = message_params.to_h.symbolize_keys.slice(:content, :reply_to_id)
+      @messages = attachments.each_with_index.map do |file, i|
+        msg = @conversation.messages.build(
+          base.merge(content: i.zero? ? content : nil, sender: current_user)
+        )
+        msg.attachment.attach(file)
+        msg.message_type = detect_message_type(file)
+        authorize msg
+        msg.save! ? msg : nil
+      end.compact
+      if @messages.any?
+        @messages.each { |msg| fetch_link_preview_now(msg) }
+        @conversation.participants.find_by(user: current_user)&.mark_read!
+        respond_to do |format|
+          format.turbo_stream
+          format.html { redirect_to conversation_path(@conversation) }
+        end
+      else
+        redirect_to conversation_path(@conversation), alert: "Não foi possível enviar."
       end
     else
-      redirect_to conversation_path(@conversation), alert: "Não foi possível enviar a mensagem."
+      # Um anexo ou só texto (não passar attachment ao build — evita "expected attachable, got []")
+      @message = @conversation.messages.build(message_params.except(:attachment))
+      @message.sender = current_user
+      if attachments.one?
+        @message.attachment.attach(attachments.first)
+        @message.message_type = detect_message_type(attachments.first)
+      end
+      authorize @message
+      if @message.save
+        fetch_link_preview_now(@message)
+        @conversation.participants.find_by(user: current_user)&.mark_read!
+        respond_to do |format|
+          format.turbo_stream
+          format.html { redirect_to conversation_path(@conversation) }
+        end
+      else
+        redirect_to conversation_path(@conversation), alert: "Não foi possível enviar a mensagem."
+      end
     end
   end
 
@@ -81,6 +108,7 @@ class MessagesController < ApplicationController
     ReadReceipt.find_or_create_by!(message: message, user: current_user) do |rr|
       rr.read_at = Time.current
     end
+    message.advance_to_read_if_receipts_complete!
     head :ok
   end
 
@@ -88,9 +116,9 @@ class MessagesController < ApplicationController
     @pagy, messages = pagy(
       @conversation.messages
                    .visible
-                   .includes(:sender, :reply_to, :reactions, attachment_attachment: :blob)
+                   .includes(:sender, :reply_to, :reactions, read_receipts: :user, conversation: { participants: :user }, attachment_attachment: :blob)
                    .order(created_at: :desc),
-      items: 40,
+      limit: 40,
       page: params[:page] || 1
     )
     @messages = messages.reverse
@@ -134,7 +162,7 @@ class MessagesController < ApplicationController
   end
 
   def message_params
-    params.require(:message).permit(:content, :reply_to_id)
+    params.require(:message).permit(:content, :reply_to_id, attachment: [])
   end
 
   def detect_message_type(file)
@@ -145,5 +173,12 @@ class MessagesController < ApplicationController
     when /video/ then :video
     else :document
     end
+  end
+
+  # Busca o preview de link já na resposta para aparecer no turbo_stream; também faz broadcast para os outros.
+  def fetch_link_preview_now(message)
+    return unless message.content.to_s.match?(%r{\bhttps?://})
+    LinkPreviewJob.perform_now(message.id)
+    message.reload
   end
 end

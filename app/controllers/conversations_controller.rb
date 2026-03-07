@@ -2,14 +2,16 @@ class ConversationsController < ApplicationController
   before_action :set_conversation, only: %i[ show add_participant remove_participant archive unarchive toggle_pin ]
 
   def index
-    @conversations = current_user.conversations
-                                 .sorted_for(current_user)
-                                 .includes(:users, :messages, :company)
-                                 .where(participants: { archived: false })
-    @archived_conversations = current_user.conversations
-                                          .archived(current_user)
-                                          .includes(:users, :messages, :company)
-                                          .recent
+    # Pluck IDs with order to avoid duplicate rows from joins; then load by id for uniqueness
+    ordered_ids = Conversation.joins(:participants)
+      .where(participants: { user_id: current_user.id, archived: false })
+      .order("participants.pinned DESC, conversations.updated_at DESC")
+      .pluck(:id).uniq
+    @conversations = Conversation.where(id: ordered_ids).includes(:users, :messages, :company, :participants)
+    @conversations = @conversations.sort_by { |c| ordered_ids.index(c.id) }
+
+    archived_ids = current_user.conversations.archived(current_user).pluck(:id).uniq
+    @archived_conversations = Conversation.where(id: archived_ids).includes(:users, :messages, :company, :participants).recent
     @users = User.where.not(id: current_user.id).order(:display_name)
     @pending_requests_count = current_user.pending_contact_requests_count
   end
@@ -19,13 +21,18 @@ class ConversationsController < ApplicationController
     @pagy, @messages = pagy(
       @conversation.messages
                    .visible
-                   .includes(:sender, :reply_to, :reactions, attachment_attachment: :blob)
+                   .includes(:sender, :reply_to, :reactions, :read_receipts, conversation: { participants: :user }, attachment_attachment: :blob)
                    .order(created_at: :desc),
-      items: 40
+      limit: 40
     )
     # Reverse so oldest appears at top, newest at bottom
     @messages = @messages.reverse
     @participant = @conversation.participants.find_by(user: current_user)
+    @had_unread = @conversation.unread_count_for(current_user)
+    # Primeira mensagem não lida (para mostrar divisor "Mensagens não lidas" no estilo WhatsApp)
+    last_read = @participant&.last_read_at || Time.at(0)
+    first_unread = @messages.find { |m| m.created_at > last_read && m.sender_id != current_user.id }
+    @first_unread_message_id = first_unread&.id
     @participant&.mark_read!
   end
 

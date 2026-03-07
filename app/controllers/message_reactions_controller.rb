@@ -11,15 +11,22 @@ class MessageReactionsController < ApplicationController
     existing = @message.reactions.find_by(user: current_user, emoji: emoji)
 
     if existing
-      # Toggle off if same emoji
       existing.destroy
     else
-      # Remove any other emoji from this user on this message first
       @message.reactions.where(user: current_user).destroy_all
       @message.reactions.create!(user: current_user, emoji: emoji)
     end
 
-    head :ok
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          "reactions_#{@message.id}",
+          partial: "messages/message_reactions",
+          locals: { message: @message.reload, current_user: current_user }
+        )
+      end
+      format.html { redirect_to conversation_path(@conversation) }
+    end
   end
 
   private
