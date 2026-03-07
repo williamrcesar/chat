@@ -50,6 +50,44 @@
                 class: "w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884] transition-colors resize-none" %>
         </div>
 
+        <div class="border-t border-[#2a3942] pt-6 mt-6">
+          <h2 class="text-[#8696a0] text-xs font-semibold mb-3 uppercase tracking-wide">Notificações (padrão para novas conversas)</h2>
+          <p class="text-[#8696a0] text-sm mb-4">Configure som, cor e ícone padrão. Em cada conversa você pode personalizar ou mutar.</p>
+          <div class="space-y-4">
+            <div>
+              <%= f.label :default_notification_sound, "Som", class: "block text-[#8696a0] text-xs font-semibold mb-1" %>
+              <%= f.select :default_notification_sound,
+                    NotificationPreferences::DEFAULT_SOUNDS.map { |s| [ s[:name], s[:id] ] },
+                    {},
+                    class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+            </div>
+            <div>
+              <%= f.label :default_notification_color, "Cor do ícone (hex)", class: "block text-[#8696a0] text-xs font-semibold mb-1" %>
+              <div class="flex gap-2 items-center">
+                <%= f.color_field :default_notification_color,
+                      value: @user.default_notification_color.presence || "#00a884",
+                      class: "h-10 w-14 rounded border-0 bg-[#2a3942] cursor-pointer" %>
+                <%= f.text_field :default_notification_color,
+                      placeholder: "#00a884",
+                      class: "flex-1 bg-[#2a3942] text-white rounded-lg px-4 py-3 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
+              </div>
+            </div>
+            <div>
+              <span class="block text-[#8696a0] text-xs font-semibold mb-2">Ícone da notificação</span>
+              <div class="flex gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <%= f.radio_button :default_notification_icon_type, "avatar", class: "text-[#00a884]" %>
+                  <span class="text-white text-sm">Foto do contato</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <%= f.radio_button :default_notification_icon_type, "color", class: "text-[#00a884]" %>
+                  <span class="text-white text-sm">Cor sólida</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <%= f.submit "Salvar",
               class: "w-full bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
       <% end %>

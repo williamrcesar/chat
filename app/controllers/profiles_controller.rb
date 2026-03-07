@@ -19,6 +19,9 @@ class ProfilesController < ApplicationController
   private
 
   def profile_params
-    params.require(:user).permit(:display_name, :phone, :bio, :avatar)
+    params.require(:user).permit(
+      :display_name, :phone, :bio, :avatar,
+      :default_notification_sound, :default_notification_color, :default_notification_icon_type
+    )
   end
 end

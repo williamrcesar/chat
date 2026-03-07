@@ -1,5 +1,11 @@
-# Notification sound
+# Notification sounds
 
-Place a file named `notification.mp3` here to use a custom sound for web push notifications.
+Sons padrão (opcionais). Se não existirem, o app usa um beep curto (Web Audio).
 
-If the file is missing, the app will play a short fallback beep (Web Audio) when a notification is received and the tab is open.
+- `notification.mp3` — padrão
+- `ding.mp3` — sino
+- `chime.mp3` — chime
+- `pop.mp3` — pop
+- `soft.mp3` — suave
+
+Cada conversa pode usar um desses ou um áudio customizado (máx. 6 segundos) nas configurações da conversa.

@@ -120,20 +120,14 @@ class Message < ApplicationRecord
       })
 
       # Web Push for all recipients with subscription (skip sender).
-      # Sent even when user is online so they get a notification in another tab or when not focused on this conversation.
       next if participant.user_id == sender_id
+      next if participant.muted?
       if participant.user.web_push_subscriptions.none?
         Rails.logger.info("[WebPush] Skipped: user_id=#{participant.user_id} has no subscriptions (recipient must enable notifications in the app on that device)")
         next
       end
 
-      push_payload = {
-        title:   sender.display_name,
-        body:    push_body,
-        icon:    "/icon.png",
-        badge:   "/icon.png",
-        data:    { path: "/conversations/#{conversation_id}" }
-      }
+      push_payload = build_push_payload_for(participant)
       WebPushNotificationJob.perform_later(participant.user_id, push_payload)
       Rails.logger.info("[WebPush] Enqueued push for user_id=#{participant.user_id} (see worker log for result)")
     end
@@ -143,6 +137,26 @@ class Message < ApplicationRecord
       update_column(:status, Message.statuses[:delivered])
       broadcast_deletion_update
     end
+  end
+
+  def build_push_payload_for(participant)
+    icon_url = Rails.application.routes.url_helpers.notification_icon_url(
+      token: participant.notification_icon_token
+    )
+    sound = if participant.notification_sound_file.attached?
+              Rails.application.routes.url_helpers.rails_blob_url(participant.notification_sound_file)
+            else
+              NotificationPreferences.sound_path(participant.effective_notification_sound).presence || NotificationPreferences.sound_path("default")
+            end
+    {
+      title:   sender.display_name,
+      body:    push_body,
+      icon:    icon_url,
+      badge:   "/icon.png",
+      sound:   sound,
+      color:   participant.effective_notification_color.presence,
+      data:    { path: "/conversations/#{conversation_id}" }
+    }.compact
   end
 
   def push_body

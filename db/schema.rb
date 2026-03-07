@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_07_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -207,6 +207,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.boolean "pinned", default: false, null: false
     t.datetime "interactive_locked_until"
     t.bigint "interactive_message_id"
+    t.string "notification_sound"
+    t.string "notification_color"
+    t.string "notification_icon_type"
     t.index ["archived"], name: "index_participants_on_archived"
     t.index ["conversation_id"], name: "index_participants_on_conversation_id"
     t.index ["pinned"], name: "index_participants_on_pinned"
@@ -257,6 +260,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.datetime "updated_at", null: false
     t.integer "role", default: 0, null: false
     t.string "nickname"
+    t.string "default_notification_sound", default: "default", null: false
+    t.string "default_notification_color"
+    t.string "default_notification_icon_type", default: "avatar", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["jti"], name: "index_users_on_jti", unique: true
     t.index ["nickname"], name: "index_users_on_nickname", unique: true

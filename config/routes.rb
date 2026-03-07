@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   root to: redirect("/users/sign_in")
 
   resources :conversations, only: %i[ index show create ] do
+    resource :notification_settings, only: %i[ show update ], controller: "conversations/notification_settings"
     member do
       post   :add_participant
       delete "participants/:user_id", action: :remove_participant, as: :remove_participant
@@ -95,6 +96,9 @@ Rails.application.routes.draw do
   resources :web_push_subscriptions, only: %i[ create destroy ] do
     collection { get :vapid_public_key }
   end
+
+  # Signed URL for push notification icon (avatar, color, or custom image)
+  get "notification_icons/show", to: "notification_icons#show", as: :notification_icon
 
   # Admin dashboard
   namespace :admin do

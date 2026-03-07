@@ -1,5 +1,6 @@
 class User < ApplicationRecord
   include Devise::JWT::RevocationStrategies::JTIMatcher
+  include NotificationPreferences
 
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable, :trackable,
@@ -30,6 +31,8 @@ class User < ApplicationRecord
   validates :phone,    format: { with: /\A\+?[\d\s\-()]+\z/ }, allow_blank: true
   validates :nickname, uniqueness: { case_sensitive: false }, allow_blank: true,
                        format: { with: /\A[a-z0-9_]{3,30}\z/, message: "only lowercase letters, numbers and underscores (3-30 chars)" }
+  validates :default_notification_sound, inclusion: { in: -> { NotificationPreferences.sound_ids } }
+  validates :default_notification_icon_type, inclusion: { in: NotificationPreferences::ICON_TYPES }
 
   before_save :downcase_nickname
   after_create :generate_display_name_if_blank

@@ -5,8 +5,9 @@ import "controllers"
 // Play notification sound when a push is received (message from service worker).
 // Tries /sounds/notification.mp3 first; falls back to a short Web Audio beep if missing.
 if (typeof navigator !== "undefined" && navigator.serviceWorker) {
-  function playNotificationSound() {
-    const audio = new Audio("/sounds/notification.mp3");
+  function playNotificationSound(soundSrc) {
+    const src = soundSrc || "/sounds/notification.mp3";
+    const audio = new Audio(src);
     audio.volume = 0.6;
     audio.play().catch(() => {
       try {
@@ -28,6 +29,6 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
   }
 
   navigator.serviceWorker.addEventListener("message", (event) => {
-    if (event.data?.type === "play-notification-sound") playNotificationSound();
+    if (event.data?.type === "play-notification-sound") playNotificationSound(event.data.sound);
   });
 }

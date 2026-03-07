@@ -3,6 +3,10 @@ class ConversationPolicy < ApplicationPolicy
     participant?
   end
 
+  def update?
+    participant?  # used for notification_settings (update own participant)
+  end
+
   def create?
     user.present?
   end

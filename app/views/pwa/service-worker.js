@@ -17,21 +17,23 @@ self.addEventListener("push", async (event) => {
     body:    payload.body    || "",
     icon:    payload.icon    || "/icon.png",
     badge:   payload.badge   || "/icon.png",
+    image:   payload.image   || undefined,
     vibrate: [200, 100, 200],
     silent:  false,
     data:    payload.data    || { path: "/" },
     actions: [
-      { action: "open",    title: "Open chat" },
-      { action: "dismiss", title: "Dismiss" }
+      { action: "open",    title: "Abrir chat" },
+      { action: "dismiss", title: "Dispensar" }
     ]
   };
+  options.tag = "chat-" + (payload.data?.path || "/").replace(/\//g, "-");
 
   event.waitUntil(
     self.registration.showNotification(title, options).then(() =>
       clients.matchAll({ type: "window", includeUncontrolled: true })
     ).then((clientList) => {
       clientList.forEach((client) => {
-        client.postMessage({ type: "play-notification-sound" });
+        client.postMessage({ type: "play-notification-sound", sound: payload.sound });
       });
     })
   );
