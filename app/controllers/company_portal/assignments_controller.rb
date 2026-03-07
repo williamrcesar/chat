@@ -1,4 +1,4 @@
-module Company
+module CompanyPortal
   class AssignmentsController < BaseController
     before_action :set_assignment, only: %i[ show transfer resolve ]
 

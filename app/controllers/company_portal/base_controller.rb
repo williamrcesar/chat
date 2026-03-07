@@ -1,8 +1,13 @@
-module Company
+module CompanyPortal
   class BaseController < ApplicationController
     layout "company"
     before_action :set_current_company
     before_action :require_company_member!
+
+    # Views stay in app/views/company/ so we don't have to move them
+    def self.controller_path
+      "company/#{name.demodulize.underscore.sub(/_controller$/, '')}"
+    end
 
     private
 

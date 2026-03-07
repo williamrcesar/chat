@@ -1,13 +1,13 @@
-<% content_for :title, "Nova Campanha" %>
+<% content_for :title, "Editar Campanha" %>
 
 <div class="max-w-2xl mx-auto">
   <div class="mb-6">
-    <h1 class="text-2xl font-semibold text-white">Nova Campanha de Envio</h1>
-    <p class="text-[#8696a0] text-sm mt-1">Configure os destinatários e escolha o template. Limite: 1000/dia.</p>
+    <h1 class="text-2xl font-semibold text-white">Editar Campanha</h1>
+    <p class="text-[#8696a0] text-sm mt-1">Altere nome, template ou destinatários. Só campanhas em rascunho podem ser editadas.</p>
   </div>
 
   <div class="bg-[#202c33] rounded-xl p-6">
-    <%= form_with model: @campaign, url: marketing_campaigns_path, method: :post, class: "space-y-5" do |f| %>
+    <%= form_with model: @campaign, url: marketing_campaign_path(@campaign), method: :patch, class: "space-y-5" do |f| %>
       <% if @campaign.errors.any? %>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
           <% @campaign.errors.full_messages.each do |msg| %>
@@ -28,31 +28,28 @@
               @templates.map { |t| [t.name, t.id] },
               { include_blank: "Selecione um template..." },
               class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
-        <% if params[:template_id].present? %>
-          <script>document.querySelector('select[name="marketing_campaign[marketing_template_id]"]').value = "<%= params[:template_id] %>"</script>
-        <% end %>
       </div>
 
       <div>
         <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">
-          Destinatários (um por linha — @nickname ou telefone)
+          Destinatários (um por linha — @nickname, e-mail ou telefone)
         </label>
         <textarea name="recipients_raw" rows="10"
-                  placeholder="@alice&#10;@bob&#10;+5511999999999&#10;carol"
-                  class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884] font-mono resize-y"></textarea>
+                  placeholder="@alice&#10;@bob&#10;+5511999999999&#10;email@exemplo.com"
+                  class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884] font-mono resize-y"><%= Array(@campaign.recipient_identifiers).join("\n") %></textarea>
         <p class="text-[#8696a0] text-xs mt-1">Máximo de 1000 destinatários por campanha.</p>
       </div>
 
       <div>
         <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Limite diário de envios</label>
-        <%= f.number_field :daily_limit, value: 1000, min: 1, max: 1000,
+        <%= f.number_field :daily_limit, min: 1, max: 1000,
               class: "w-full bg-[#2a3942] text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]" %>
       </div>
 
       <div class="pt-2 flex gap-3">
-        <%= f.submit "Criar Campanha",
+        <%= f.submit "Salvar alterações",
               class: "flex-1 bg-[#00a884] hover:bg-[#02966f] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer" %>
-        <%= link_to "Cancelar", marketing_campaigns_path,
+        <%= link_to "Cancelar", marketing_campaign_path(@campaign),
               class: "px-5 py-3 text-[#8696a0] hover:text-white text-sm font-semibold rounded-lg transition-colors border border-[#2a3942]" %>
       </div>
     <% end %>
@@ -67,7 +64,6 @@
       e.preventDefault();
       const raw = document.querySelector("textarea[name='recipients_raw']").value;
       const ids = raw.split("\n").map(s => s.trim()).filter(s => s.length > 0).slice(0, 1000);
-      // Remove existing hidden inputs
       document.querySelectorAll("input[name^='marketing_campaign[recipient_identifiers]']").forEach(el => el.remove());
       ids.forEach(function(id, i) {
         const input = document.createElement("input");

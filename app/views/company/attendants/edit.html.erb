@@ -7,7 +7,7 @@
   </div>
 
   <div class="bg-[#202c33] rounded-xl p-6">
-    <%= form_with model: [:company, @attendant], class: "space-y-5" do |f| %>
+    <%= form_with model: @attendant, url: company_attendant_path(@attendant), method: :patch, class: "space-y-5" do |f| %>
       <% if @attendant.errors.any? %>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
           <% @attendant.errors.full_messages.each do |msg| %>

@@ -11,6 +11,13 @@ class MarketingTemplate < ApplicationRecord
     buttons.any?
   end
 
+  # JSONB can be stored as Hash (e.g. {"0"=>{...}}) from form params; normalise to array for iteration.
+  def buttons_list
+    b = buttons
+    return [] if b.blank?
+    b.is_a?(Hash) ? b.values : Array(b)
+  end
+
   def has_list?
     list_sections.any?
   end

@@ -34,9 +34,9 @@
   <p class="text-[#8696a0] text-xs text-right">agora ✓</p>
 
   <%# Buttons %>
-  <% if template.buttons.any? %>
+  <% if template.buttons_list.any? %>
     <div class="border-t border-[#2a3942] pt-2 space-y-1.5">
-      <% template.buttons.each do |btn| %>
+      <% template.buttons_list.each do |btn| %>
         <button type="button"
                 class="w-full text-[#00a884] text-sm font-semibold py-1.5 rounded-lg border border-[#00a884]/30 hover:bg-[#00a884]/10 transition-colors">
           <%= btn["label"] || btn[:label] %>

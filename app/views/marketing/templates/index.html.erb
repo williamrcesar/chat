@@ -60,7 +60,7 @@
 
         <% if t.has_buttons? %>
           <div class="flex flex-wrap gap-1">
-            <% t.buttons.each do |btn| %>
+            <% t.buttons_list.each do |btn| %>
               <span class="border border-[#00a884] text-[#00a884] text-xs px-2 py-0.5 rounded-lg">
                 <%= btn["label"] || btn[:label] %>
               </span>

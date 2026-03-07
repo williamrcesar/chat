@@ -44,7 +44,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
 
   create_table "campaign_deliveries", force: :cascade do |t|
     t.bigint "campaign_id", null: false
-    t.bigint "recipient_user_id", null: false
+    t.bigint "recipient_user_id"
     t.bigint "message_id"
     t.integer "status", default: 0, null: false
     t.string "clicked_button_label"
@@ -54,7 +54,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
     t.datetime "clicked_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["campaign_id", "recipient_user_id"], name: "index_campaign_deliveries_on_campaign_id_and_recipient_user_id", unique: true
+    t.string "recipient_identifier"
+    t.index ["campaign_id", "recipient_user_id"], name: "index_campaign_deliveries_on_campaign_and_user_uniq", unique: true, where: "(recipient_user_id IS NOT NULL)"
     t.index ["campaign_id"], name: "index_campaign_deliveries_on_campaign_id"
     t.index ["message_id"], name: "index_campaign_deliveries_on_message_id"
     t.index ["recipient_user_id"], name: "index_campaign_deliveries_on_recipient_user_id"

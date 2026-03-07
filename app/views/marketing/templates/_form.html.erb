@@ -89,7 +89,7 @@
       </div>
 
       <div data-template-builder-target="buttonsList" class="space-y-2">
-        <% (template.buttons || []).each_with_index do |btn, i| %>
+        <% template.buttons_list.each_with_index do |btn, i| %>
           <%= render "marketing/templates/button_row", f: f, btn: btn, index: i %>
         <% end %>
       </div>

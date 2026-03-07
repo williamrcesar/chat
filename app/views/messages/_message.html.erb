@@ -226,7 +226,7 @@
               <%# Buttons %>
               <% if tmpl.has_buttons? %>
                 <div class="border-t border-black/20 mt-2 pt-2 space-y-1.5">
-                  <% tmpl.buttons.each do |btn| %>
+                  <% tmpl.buttons_list.each do |btn| %>
                     <% already_clicked = delivery.clicked_button_label == (btn["label"] || btn[:label]) %>
                     <button type="button"
                             data-interactive-message-target="button"

@@ -13,7 +13,17 @@ class SendCampaignJob < ApplicationJob
       break unless campaign.reload.status_running?
 
       recipient = resolve_user(identifier)
-      next unless recipient
+      unless recipient
+        Rails.logger.warn "[SendCampaignJob] Identifier não encontrado: #{identifier.inspect} (campaign_id=#{campaign.id})"
+        # Cria entrega em "falhou" para aparecer no Kanban
+        CampaignDelivery.create!(
+          campaign:            campaign,
+          recipient_user_id:  nil,
+          recipient_identifier: identifier,
+          status:             :failed
+        )
+        next
+      end
 
       # Skip if already delivered
       next if CampaignDelivery.exists?(campaign: campaign, recipient_user: recipient)
@@ -74,8 +84,41 @@ class SendCampaignJob < ApplicationJob
   private
 
   def resolve_user(identifier)
-    id = identifier.to_s.strip.gsub(/\A@/, "")
-    User.find_by("lower(nickname) = ?", id.downcase) ||
-      User.find_by(phone: identifier.to_s.strip)
+    raw = identifier.to_s.strip
+    return nil if raw.blank?
+
+    # @nickname ou nickname (case-insensitive)
+    nick = raw.gsub(/\A@/, "")
+    u = User.find_by("lower(nickname) = ?", nick.downcase) if nick.present?
+    return u if u
+
+    # E-mail (case-insensitive)
+    u = User.find_by("lower(email) = ?", raw.downcase)
+    return u if u
+
+    # Telefone exato
+    u = User.find_by(phone: raw)
+    return u if u
+
+    # Telefone: comparação por só dígitos (ex.: "55 11 99999" = "+5511999999999")
+    if raw.match?(/\A\+?[\d\s\-()]+\z/)
+      digits = raw.gsub(/\D/, "")
+      u = User.where("phone IS NOT NULL AND phone != '' AND REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = ?", digits).first
+      return u if u
+    end
+
+    # display_name exato (case-insensitive)
+    u = User.find_by("lower(display_name) = ?", raw.downcase)
+    return u if u
+
+    # display_name contém o termo (ex.: "@Rodrigues" → "João Rodrigues")
+    if nick.present?
+      pattern = "%#{sanitize_sql_like(nick.downcase)}%"
+      User.find_by("lower(display_name) LIKE ? ESCAPE '\\'", pattern)
+    end
+  end
+
+  def sanitize_sql_like(str)
+    str.to_s.gsub(/[%_\\]/) { |c| "\\#{c}" }
   end
 end

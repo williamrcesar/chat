@@ -55,7 +55,7 @@ Rails.application.routes.draw do
     resources :templates do
       member { get :preview }
     end
-    resources :campaigns, only: %i[ index show new create ] do
+    resources :campaigns, only: %i[ index show new create edit update ] do
       member do
         post :launch
         post :pause
@@ -72,8 +72,8 @@ Rails.application.routes.draw do
   # Company accounts — creation and public profile
   resources :companies, only: %i[ new create show ]
 
-  # Company namespace — dashboard, attendants, settings, assignments
-  namespace :company do
+  # Company portal (module CompanyPortal to avoid conflict with Company model)
+  scope path: "company", as: "company", module: "company_portal" do
     get "dashboard", to: "dashboard#index", as: :dashboard
     resource  :settings, only: %i[ show edit update ]
 

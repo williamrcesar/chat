@@ -2,7 +2,7 @@
 
 <div class="max-w-4xl">
   <%# Back + header %>
-  <div class="flex items-center gap-3 mb-6">
+  <div class="flex flex-wrap items-center gap-3 mb-6">
     <%= link_to company_assignments_path, class: "text-[#8696a0] hover:text-white transition-colors" do %>
       ← Voltar
     <% end %>
@@ -15,11 +15,19 @@
       "resolved"    => ["bg-[#8696a0]/20 text-[#8696a0]", "Resolvido"]
     }[@assignment.status] || ["", @assignment.status] %>
     <span class="<%= badge[0] %> text-xs px-2 py-0.5 rounded-full"><%= badge[1] %></span>
+    <%= link_to conversation_path(@assignment.conversation),
+          class: "ml-auto bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2" do %>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      </svg>
+      Abrir conversa
+    <% end %>
   </div>
 
   <div class="grid grid-cols-3 gap-6">
     <%# Message thread %>
     <div class="col-span-2">
+      <p class="text-[#8696a0] text-xs mb-2">Visualização. Para responder, use o botão <strong class="text-[#00a884]">Abrir conversa</strong> acima.</p>
       <div class="bg-[#0b141a] rounded-xl h-[60vh] overflow-y-auto p-4 space-y-3 flex flex-col-reverse">
         <% @messages.reverse.each do |msg| %>
           <div class="flex <%= msg.sender_id == current_user.id ? 'justify-end' : 'justify-start' %>">
