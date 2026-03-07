@@ -1,15 +1,14 @@
 import { Controller } from "@hotwired/stimulus"
 import { createConsumer } from "@rails/actioncable"
-
-// ICE / STUN servers (using free Google STUN + optional TURN)
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    // TODO: Add TURN server credentials for production NAT traversal:
-    // { urls: "turn:your-turn-server.com", username: "user", credential: "pass" }
-  ]
-}
+import {
+  HMSReactiveStore,
+  selectLocalPeer,
+  selectRemotePeers,
+  selectVideoTrackByID,
+  selectIsLocalAudioEnabled,
+  selectIsLocalVideoEnabled,
+  selectIsConnectedToRoom
+} from "@100mslive/hms-video-store"
 
 export default class extends Controller {
   static targets = [
@@ -19,24 +18,32 @@ export default class extends Controller {
     "muteBtn", "videoBtn", "statusLabel"
   ]
 
-  connect() {
-    this.channel      = null
-    this.pc           = null         // RTCPeerConnection
-    this.localStream  = null
-    this.remoteUserId = null
-    this.callType     = "video"
-    this.isMuted      = false
-    this.isVideoOff   = false
+  static values = { userName: String }
 
+  connect() {
+    this.channel = null
+    this.remoteUserId = null
+    this.callType = "video"
+    this.pendingOffer = null // { room_id, token, caller_name, caller_id, call_type }
+    this.unsubscribes = []
+
+    this.initHms()
     this.setupSignalingChannel()
+    this.setupLeaveOnUnload()
   }
 
   disconnect() {
-    this.hangup()
+    this.leaveHms()
     this.channel?.unsubscribe()
+    this.unsubscribes.forEach(fn => fn?.())
   }
 
-  // ─── Signaling channel ───────────────────────────────────────────────────
+  initHms() {
+    this.hms = new HMSReactiveStore()
+    this.hms.triggerOnSubscribe?.()
+    this.hmsActions = this.hms.getActions()
+    this.hmsStore = this.hms.getStore()
+  }
 
   setupSignalingChannel() {
     const consumer = createConsumer()
@@ -45,96 +52,152 @@ export default class extends Controller {
     })
   }
 
+  setupLeaveOnUnload() {
+    this.boundLeave = () => this.hmsActions?.leave?.()
+    window.addEventListener("beforeunload", this.boundLeave)
+    window.addEventListener("pagehide", this.boundLeave)
+  }
+
   handleSignal(data) {
     switch (data.type) {
-      case "call_offer":    return this.handleOffer(data)
-      case "call_answer":   return this.handleAnswer(data)
-      case "ice_candidate": return this.handleIceCandidate(data)
+      case "call_offer":   return this.handleOffer(data)
       case "call_rejected": return this.handleRejected()
-      case "call_ended":    return this.handleRemoteEnd()
+      case "call_ended":   return this.handleRemoteEnd()
     }
   }
 
-  // ─── Initiate a call ─────────────────────────────────────────────────────
+  // ─── Start call (caller) ─────────────────────────────────────────────────
 
   async startCall(event) {
-    const btn           = event.currentTarget
-    this.remoteUserId   = btn.dataset.userId
-    this.callType       = btn.dataset.callType || "video"
+    const btn = event.currentTarget
+    this.remoteUserId = btn.dataset.userId
+    this.callType = btn.dataset.callType || "video"
     const conversationId = btn.dataset.conversationId
 
-    await this.acquireMedia()
-    this.createPeerConnection()
-
-    // Create and send offer
-    const offer = await this.pc.createOffer()
-    await this.pc.setLocalDescription(offer)
-
-    this.channel.perform("offer", {
-      to_user_id:      this.remoteUserId,
-      conversation_id: conversationId,
-      call_type:       this.callType,
-      sdp:             offer
+    const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
+    const res = await fetch("/calls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        call_type: this.callType
+      })
     })
 
-    this.showActiveModal("Chamando...", this.callType)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || "Não foi possível iniciar a chamada.")
+      return
+    }
+
+    const { room_id, token } = await res.json()
+    this.showActiveModal("Entrando...", this.callType)
+
+    try {
+      await this.joinRoom(token)
+    } catch (err) {
+      console.error(err)
+      alert("Falha ao entrar na sala: " + (err?.message || err))
+      this.hangup()
+    }
   }
 
-  // ─── Incoming call handlers ───────────────────────────────────────────────
+  // ─── Incoming call ──────────────────────────────────────────────────────
 
   handleOffer(data) {
-    this.pendingOffer  = data.sdp
-    this.remoteUserId  = data.from_user_id
-    this.callType      = data.call_type
+    this.pendingOffer = {
+      room_id: data.room_id,
+      token: data.token,
+      caller_name: data.caller_name,
+      caller_id: data.caller_id,
+      call_type: data.call_type || "video"
+    }
+    this.remoteUserId = String(data.caller_id)
+    this.callType = this.pendingOffer.call_type
 
-    if (this.hasCallerNameTarget)  this.callerNameTarget.textContent  = data.from_user_name
-    if (this.hasCallTypeLabelTarget) this.callTypeLabelTarget.textContent = data.call_type === "video" ? "📹 Chamada de vídeo" : "📞 Chamada de voz"
-
+    if (this.hasCallerNameTarget) this.callerNameTarget.textContent = data.caller_name || "Alguém"
+    if (this.hasCallTypeLabelTarget) this.callTypeLabelTarget.textContent = this.callType === "video" ? "📹 Chamada de vídeo" : "📞 Chamada de voz"
     this.incomingModalTarget?.classList.remove("hidden")
-    this.ringAudio?.play().catch(() => {})
   }
 
   async acceptCall() {
     this.incomingModalTarget?.classList.add("hidden")
-    this.ringAudio?.pause()
-
-    await this.acquireMedia()
-    this.createPeerConnection()
-
-    await this.pc.setRemoteDescription(new RTCSessionDescription(this.pendingOffer))
-    const answer = await this.pc.createAnswer()
-    await this.pc.setLocalDescription(answer)
-
-    this.channel.perform("answer", {
-      to_user_id: this.remoteUserId,
-      sdp:        answer
-    })
-
-    this.showActiveModal("Em chamada", this.callType)
+    const { token } = this.pendingOffer || {}
+    if (!token) return
+    this.showActiveModal("Entrando...", this.callType)
+    try {
+      await this.joinRoom(token)
+    } catch (err) {
+      console.error(err)
+      alert("Falha ao entrar na sala: " + (err?.message || err))
+      this.hangup()
+    }
+    this.pendingOffer = null
   }
 
   rejectCall() {
     this.incomingModalTarget?.classList.add("hidden")
-    this.ringAudio?.pause()
-    this.channel.perform("reject", { to_user_id: this.remoteUserId })
+    if (this.remoteUserId) {
+      this.channel.perform("reject", { to_user_id: this.remoteUserId })
+    }
     this.remoteUserId = null
     this.pendingOffer = null
   }
 
-  // ─── Call established ─────────────────────────────────────────────────────
+  // ─── Room join & video attach ─────────────────────────────────────────────
 
-  async handleAnswer(data) {
-    await this.pc?.setRemoteDescription(new RTCSessionDescription(data.sdp))
+  async joinRoom(authToken) {
+    const userName = this.userNameValue || "User"
+    await this.hmsActions.join({
+      userName,
+      authToken,
+      settings: {
+        isAudioMuted: false,
+        isVideoMuted: this.callType === "audio"
+      },
+      rememberDeviceSelection: true
+    })
+
+    this.attachVideos()
+    this.subscribeToConnectionState()
     if (this.hasStatusLabelTarget) this.statusLabelTarget.textContent = "Em chamada"
   }
 
-  async handleIceCandidate(data) {
-    if (data.candidate && this.pc) {
-      try {
-        await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate))
-      } catch (e) { /* ignore stale candidates */ }
-    }
+  attachVideos() {
+    // Local peer → localVideo (subscribe so we attach when local peer has video track)
+    const unsubLocal = this.hmsStore.subscribe((peer) => {
+      if (!peer?.videoTrack || !this.hasLocalVideoTarget) return
+      const track = this.hmsStore.getState(selectVideoTrackByID(peer.videoTrack))
+      if (track?.enabled) this.hmsActions.attachVideo(track.id, this.localVideoTarget)
+    }, selectLocalPeer)
+
+    // First remote peer → remoteVideo
+    const unsubRemote = this.hmsStore.subscribe((peers) => {
+      const peer = Array.isArray(peers) ? (peers.find(p => p.videoTrack) || peers[0]) : null
+      if (!peer || !this.hasRemoteVideoTarget) return
+      if (peer.videoTrack) {
+        const track = this.hmsStore.getState(selectVideoTrackByID(peer.videoTrack))
+        if (track?.enabled) this.hmsActions.attachVideo(track.id, this.remoteVideoTarget)
+      }
+    }, selectRemotePeers)
+
+    this.unsubscribes.push(unsubLocal, unsubRemote)
   }
+
+  subscribeToConnectionState() {
+    const unsub = this.hmsStore.subscribe((connected) => {
+      if (this.hasStatusLabelTarget) {
+        this.statusLabelTarget.textContent = connected ? "Em chamada" : "Desconectado"
+      }
+    }, selectIsConnectedToRoom)
+    this.unsubscribes.push(unsub)
+  }
+
+  // ─── Rejected / ended ─────────────────────────────────────────────────────
 
   handleRejected() {
     this.showToast("Chamada recusada.")
@@ -146,23 +209,21 @@ export default class extends Controller {
     this.hangup()
   }
 
-  // ─── In-call controls ────────────────────────────────────────────────────
+  // ─── In-call controls ─────────────────────────────────────────────────────
 
-  toggleMute() {
-    if (!this.localStream) return
-    this.isMuted = !this.isMuted
-    this.localStream.getAudioTracks().forEach(t => { t.enabled = !this.isMuted })
+  async toggleMute() {
+    const enabled = this.hmsStore.getState(selectIsLocalAudioEnabled)
+    await this.hmsActions.setLocalAudioEnabled(!enabled)
     if (this.hasMuteBtnTarget) {
-      this.muteBtnTarget.textContent = this.isMuted ? "🔇 Ativar mic" : "🎤 Mudo"
+      this.muteBtnTarget.querySelector("span:last-child").textContent = enabled ? "Ativar mic" : "Mudo"
     }
   }
 
-  toggleVideo() {
-    if (!this.localStream) return
-    this.isVideoOff = !this.isVideoOff
-    this.localStream.getVideoTracks().forEach(t => { t.enabled = !this.isVideoOff })
+  async toggleVideo() {
+    const enabled = this.hmsStore.getState(selectIsLocalVideoEnabled)
+    await this.hmsActions.setLocalVideoEnabled(!enabled)
     if (this.hasVideoBtnTarget) {
-      this.videoBtnTarget.textContent = this.isVideoOff ? "📷 Ativar câmera" : "📵 Câmera off"
+      this.videoBtnTarget.querySelector("span:last-child").textContent = enabled ? "Ativar câmera" : "Câmera off"
     }
   }
 
@@ -170,78 +231,30 @@ export default class extends Controller {
     if (this.remoteUserId) {
       this.channel.perform("end_call", { to_user_id: this.remoteUserId })
     }
+    this.leaveHms()
     this.hangup()
   }
 
-  // ─── Internal helpers ────────────────────────────────────────────────────
-
-  async acquireMedia() {
-    try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: this.callType === "video"
-      })
-      if (this.hasLocalVideoTarget && this.callType === "video") {
-        this.localVideoTarget.srcObject = this.localStream
-      }
-    } catch (err) {
-      alert("Não foi possível acessar câmera/microfone: " + err.message)
-      throw err
-    }
-  }
-
-  createPeerConnection() {
-    this.pc = new RTCPeerConnection(ICE_SERVERS)
-
-    // Send local tracks
-    this.localStream?.getTracks().forEach(track => {
-      this.pc.addTrack(track, this.localStream)
-    })
-
-    // Receive remote tracks
-    this.pc.ontrack = (event) => {
-      if (this.hasRemoteVideoTarget && event.streams[0]) {
-        this.remoteVideoTarget.srcObject = event.streams[0]
-      }
-    }
-
-    // Send ICE candidates to peer
-    this.pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.channel.perform("ice_candidate", {
-          to_user_id: this.remoteUserId,
-          candidate:  event.candidate
-        })
-      }
-    }
-
-    this.pc.onconnectionstatechange = () => {
-      if (this.hasStatusLabelTarget) {
-        this.statusLabelTarget.textContent = this.pc.connectionState
-      }
-      if (["failed", "disconnected", "closed"].includes(this.pc.connectionState)) {
-        this.hangup()
-      }
-    }
+  leaveHms() {
+    window.removeEventListener("beforeunload", this.boundLeave)
+    window.removeEventListener("pagehide", this.boundLeave)
+    this.unsubscribes.forEach(fn => fn?.())
+    this.unsubscribes = []
+    this.hmsActions?.leave?.()
   }
 
   hangup() {
-    this.localStream?.getTracks().forEach(t => t.stop())
-    this.pc?.close()
-    this.pc           = null
-    this.localStream  = null
+    this.leaveHms()
     this.remoteUserId = null
-    this.isMuted      = false
-    this.isVideoOff   = false
-
-    if (this.hasLocalVideoTarget)  this.localVideoTarget.srcObject  = null
+    this.pendingOffer = null
+    if (this.hasLocalVideoTarget) this.localVideoTarget.srcObject = null
     if (this.hasRemoteVideoTarget) this.remoteVideoTarget.srcObject = null
     this.activeModalTarget?.classList.add("hidden")
     this.incomingModalTarget?.classList.add("hidden")
   }
 
   showActiveModal(status, callType) {
-    if (this.hasStatusLabelTarget)   this.statusLabelTarget.textContent   = status
+    if (this.hasStatusLabelTarget) this.statusLabelTarget.textContent = status
     if (this.hasCallTypeLabelTarget) this.callTypeLabelTarget.textContent = callType === "video" ? "📹 Vídeo" : "📞 Voz"
     this.activeModalTarget?.classList.remove("hidden")
   }

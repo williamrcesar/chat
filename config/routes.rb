@@ -42,6 +42,8 @@ Rails.application.routes.draw do
   resource  :profile, only: %i[ show edit update ]
   resources :templates
 
+  post "calls", to: "calls#create"
+
   # Contact requests (nickname-based friendship system)
   resources :contact_requests, only: %i[ index create ] do
     member do
