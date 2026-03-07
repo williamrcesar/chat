@@ -26,7 +26,7 @@ self.addEventListener("push", async (event) => {
       { action: "dismiss", title: "Dispensar" }
     ]
   };
-  options.tag = "chat-" + (payload.data?.path || "/").replace(/\//g, "-");
+  options.tag = payload.data?.tag || ("chat-" + (payload.data?.path || "/").replace(/\//g, "-"));
 
   event.waitUntil(
     self.registration.showNotification(title, options).then(() =>

@@ -24,8 +24,20 @@ class CallsController < ApplicationController
       token: token_callee,
       call_type: call_type,
       caller_name: current_user.display_name,
-      caller_id: current_user.id
+      caller_id: current_user.id,
+      conversation_id: conversation.id
     })
+
+    # Push notification: "Fulano está ligando (vídeo/voz)" so callee sees it when app is in background
+    call_label = call_type == "video" ? "Chamada de vídeo" : "Chamada de voz"
+    WebPushNotificationJob.perform_later(
+      callee.id,
+      {
+        title: call_label,
+        body: "#{current_user.display_name} está ligando",
+        data: { path: Rails.application.routes.url_helpers.conversation_path(conversation), tag: "call" }
+      }
+    )
 
     render json: { room_id: room_id, token: token_caller }
   rescue HmsService::Error => e

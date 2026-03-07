@@ -7,15 +7,18 @@ import {
   selectVideoTrackByID,
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
-  selectIsConnectedToRoom
+  selectIsConnectedToRoom,
+  selectIsLocalScreenShared,
+  selectPeersScreenSharing,
+  selectScreenShareByPeerID
 } from "@100mslive/hms-video-store"
 
 export default class extends Controller {
   static targets = [
-    "localVideo", "remoteVideo",
+    "localVideo", "remoteVideo", "screenVideo",
     "incomingModal", "activeModal",
     "callerName", "callTypeLabel",
-    "muteBtn", "videoBtn", "statusLabel"
+    "muteBtn", "videoBtn", "screenShareBtn", "statusLabel"
   ]
 
   static values = { userName: String }
@@ -60,9 +63,10 @@ export default class extends Controller {
 
   handleSignal(data) {
     switch (data.type) {
-      case "call_offer":   return this.handleOffer(data)
+      case "call_offer":     return this.handleOffer(data)
+      case "call_accepted": return this.handleCallAccepted(data)
       case "call_rejected": return this.handleRejected()
-      case "call_ended":   return this.handleRemoteEnd()
+      case "call_ended":    return this.handleRemoteEnd()
     }
   }
 
@@ -114,7 +118,8 @@ export default class extends Controller {
       token: data.token,
       caller_name: data.caller_name,
       caller_id: data.caller_id,
-      call_type: data.call_type || "video"
+      call_type: data.call_type || "video",
+      conversation_id: data.conversation_id
     }
     this.remoteUserId = String(data.caller_id)
     this.callType = this.pendingOffer.call_type
@@ -122,15 +127,27 @@ export default class extends Controller {
     if (this.hasCallerNameTarget) this.callerNameTarget.textContent = data.caller_name || "Alguém"
     if (this.hasCallTypeLabelTarget) this.callTypeLabelTarget.textContent = this.callType === "video" ? "📹 Chamada de vídeo" : "📞 Chamada de voz"
     this.incomingModalTarget?.classList.remove("hidden")
+
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+      const title = this.callType === "video" ? "Chamada de vídeo" : "Chamada de voz"
+      new Notification(title, { body: `${data.caller_name || "Alguém"} está ligando`, tag: "incoming-call" })
+    }
   }
 
   async acceptCall() {
     this.incomingModalTarget?.classList.add("hidden")
-    const { token } = this.pendingOffer || {}
+    const offer = this.pendingOffer
+    const { token } = offer || {}
     if (!token) return
     this.showActiveModal("Entrando...", this.callType)
     try {
       await this.joinRoom(token)
+      if (this.remoteUserId && this.channel) {
+        this.channel.perform("call_accepted", {
+          to_user_id: this.remoteUserId,
+          conversation_id: offer?.conversation_id
+        })
+      }
     } catch (err) {
       console.error(err)
       alert("Falha ao entrar na sala: " + (err?.message || err))
@@ -163,8 +180,29 @@ export default class extends Controller {
     })
 
     this.attachVideos()
+    this.attachScreenShare()
     this.subscribeToConnectionState()
     if (this.hasStatusLabelTarget) this.statusLabelTarget.textContent = "Em chamada"
+  }
+
+  attachScreenShare() {
+    if (!this.hasScreenVideoTarget) return
+    const unsub = this.hmsStore.subscribe((peers) => {
+      const presenter = Array.isArray(peers) && peers.length > 0 ? peers[0] : null
+      if (!presenter?.id) {
+        this.screenVideoTarget.style.display = "none"
+        this.screenVideoTarget.srcObject = null
+        return
+      }
+      const track = this.hmsStore.getState(selectScreenShareByPeerID(presenter.id))
+      if (track?.enabled) {
+        this.hmsActions.attachVideo(track.id, this.screenVideoTarget)
+        this.screenVideoTarget.style.display = "block"
+      } else {
+        this.screenVideoTarget.style.display = "none"
+      }
+    }, selectPeersScreenSharing)
+    this.unsubscribes.push(unsub)
   }
 
   attachVideos() {
@@ -197,7 +235,11 @@ export default class extends Controller {
     this.unsubscribes.push(unsub)
   }
 
-  // ─── Rejected / ended ─────────────────────────────────────────────────────
+  // ─── Rejected / accepted / ended ───────────────────────────────────────────
+
+  handleCallAccepted() {
+    this.showToast("Chamada atendida.")
+  }
 
   handleRejected() {
     this.showToast("Chamada recusada.")
@@ -224,6 +266,20 @@ export default class extends Controller {
     await this.hmsActions.setLocalVideoEnabled(!enabled)
     if (this.hasVideoBtnTarget) {
       this.videoBtnTarget.querySelector("span:last-child").textContent = enabled ? "Ativar câmera" : "Câmera off"
+    }
+  }
+
+  async toggleScreenShare() {
+    const enabled = this.hmsStore.getState(selectIsLocalScreenShared)
+    try {
+      await this.hmsActions.setScreenShareEnabled(!enabled)
+      if (this.hasScreenShareBtnTarget) {
+        const label = this.screenShareBtnTarget.querySelector("span:last-child")
+        if (label) label.textContent = enabled ? "Compartilhar tela" : "Parar compartilhar"
+      }
+    } catch (err) {
+      console.error(err)
+      this.showToast("Não foi possível compartilhar a tela. Verifique as permissões.")
     }
   }
 
