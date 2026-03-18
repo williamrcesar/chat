@@ -139,6 +139,32 @@ class MessagesController < ApplicationController
     end
   end
 
+  def send_voice
+    audio_file = params[:audio]
+    return head(:unprocessable_entity) unless audio_file.present?
+
+    @message = @conversation.messages.new(
+      sender:       current_user,
+      content:      nil,
+      message_type: :audio,
+      metadata:     {}
+    )
+    @message.attachment.attach(audio_file)
+    authorize @message
+
+    @message.save!
+    @conversation.touch
+    @message.mark_sent!
+    mark_delivered_if_recipient_online!(@message)
+    broadcast_new_message_to_recipients(@message)
+    @conversation.participants.find_by(user: current_user)&.mark_read!
+
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to conversation_path(@conversation) }
+    end
+  end
+
   def send_sticker
     @message = @conversation.messages.new(
       sender:       current_user,

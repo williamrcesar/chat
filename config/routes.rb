@@ -26,6 +26,7 @@ Rails.application.routes.draw do
         post :from_template
         post :forward
         post :send_sticker
+        post :send_voice
         get  :search
       end
       member do
