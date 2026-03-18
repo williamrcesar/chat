@@ -3,7 +3,9 @@
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
 
-<div class="flex h-screen bg-[#111b21]" data-controller="presence contact-requests new-conversation">
+<div class="flex h-screen bg-[#111b21]"
+     data-controller="presence contact-requests new-conversation user-inbox"
+     data-user-inbox-user-id-value="<%= current_user.id %>">
 
   <%# SIDEBAR %>
   <div class="w-[400px] min-w-[400px] flex flex-col border-r border-[#2a3942] bg-[#111b21]">

@@ -22,9 +22,20 @@ class Conversation < ApplicationRecord
       .where(participants: { user_id: user.id })
       .order("participants.pinned DESC, conversations.updated_at DESC")
   }
+  scope :with_open_assignment_for_company, ->(company) {
+    joins(:conversation_assignment)
+      .merge(ConversationAssignment.open)
+      .where(conversation_assignments: { company_id: company.id })
+  }
+
+  scope :globally_active_since, ->(time_ago) {
+    joins(:messages)
+      .where("messages.created_at >= ?", time_ago)
+      .distinct
+  }
 
   def last_message
-    messages.order(sequence: :desc).first
+    messages.order(sequence: :desc, created_at: :desc).first
   end
 
   # Última reação na conversa (para preview na lista: "Fulano curtiu 👍")
@@ -35,14 +46,6 @@ class Conversation < ApplicationRecord
       .first
   end
 
-  # Se a última atividade foi uma reação (mais recente que a última mensagem), retorna { type: :reaction, user_name:, emoji: }; senão nil (mostrar última mensagem).
-  def last_activity_reaction_for_preview
-    msg = last_message
-    react = last_reaction
-    return nil unless react && msg
-    return nil if react.created_at <= msg.created_at
-    { type: :reaction, user_name: react.user.display_name, emoji: react.emoji }
-  end
 
   def unread_count_for(user)
     participant = participants.find_by(user: user)

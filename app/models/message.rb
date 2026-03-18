@@ -13,13 +13,13 @@ class Message < ApplicationRecord
 
   enum :message_type, {
     text: 0, image: 1, audio: 2, video: 3, document: 4, template: 5, marketing: 6,
-    company_menu: 7
+    company_menu: 7, sticker: 8
   }, prefix: :type
 
   # pending = na fila; sent = enviada; delivered = recebida; read = lida
   enum :status, { pending: 0, sent: 1, delivered: 2, read: 3 }, prefix: true
 
-  validates :content, presence: true, if: -> { attachment.blank? && !deleted_for_everyone? }
+  validates :content, presence: true, if: -> { attachment.blank? && !deleted_for_everyone? && !type_sticker? }
   validates :message_type, presence: true
 
   # Full-text search via pg_search
@@ -31,6 +31,7 @@ class Message < ApplicationRecord
   scope :recent,    -> { order(sequence: :asc) }
   scope :not_deleted, -> { where(deleted_at: nil) }
 
+  before_validation :strip_content
   before_create :set_sequence
   after_create_commit  -> { MessageBroadcastJob.perform_later(id) }
   after_destroy_commit -> { MessageDeletionBroadcastJob.perform_later(id, conversation_id) }
@@ -97,5 +98,11 @@ class Message < ApplicationRecord
 
     self.mark_read!
     MessageUpdateBroadcastJob.perform_now(id)
+  end
+
+  private
+
+  def strip_content
+    self.content = content.to_s.strip.presence
   end
 end

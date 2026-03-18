@@ -1,5 +1,31 @@
 class MessageReaction < ApplicationRecord
-  ALLOWED_EMOJIS = %w[👍 ❤️ 😂 😮 😢 🙏].freeze
+  # Used by reactions (validation) and by the emoji picker modal.
+  EMOJI_CATEGORIES = {
+    "Recentes / Favoritos" => %w[👍 ❤️ 😂 🙏 🔥 🎉 😮 😢],
+    "Carinhas" => %w[
+      😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 😉 😍 😘 😜 🤪 🤔 😮 😴 😭 😡 😎 🥳
+    ],
+    "Gestos" => %w[
+      👍 👎 👏 🙌 🤝 🙏 🤞 ✌️ 🤟 🤘 👊 ✊ 🤙 👋 🫶
+    ],
+    "Corações" => %w[
+      ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❤️‍🔥 ❤️‍🩹 💖 💘 💝 💞 💓 💗 💟
+    ],
+    "Objetos / Símbolos" => %w[
+      ✅ ❌ ☑️ ⚠️ ⭐️ 🌟 🔥 💯 🎯 📌 📎 🔔 🧠 💡 🕐 🗑️
+    ],
+    "Animais / Natureza" => %w[
+      🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🌿 🌸 🌻 🌙 ☀️ 🌧️
+    ],
+    "Comida" => %w[
+      🍕 🍔 🍟 🌭 🍿 🥤 ☕️ 🍺 🍷 🍩 🍪 🍫 🍎 🍌 🍉 🍓 🍇
+    ],
+    "Viagem / Lugares" => %w[
+      🚗 🚌 🚕 🚲 ✈️ 🚀 🛳️ 🗺️ 🏖️ 🏙️ 🏠 ⛺️
+    ]
+  }.freeze
+
+  ALLOWED_EMOJIS = EMOJI_CATEGORIES.values.flatten.uniq.freeze
 
   belongs_to :message
   belongs_to :user

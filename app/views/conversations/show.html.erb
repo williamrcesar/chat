@@ -5,9 +5,10 @@
 <% end %>
 
 <div class="flex h-screen bg-[#111b21]"
-     data-controller="chat"
+     data-controller="chat user-inbox"
      data-chat-conversation-id-value="<%= @conversation.id %>"
-     data-chat-interactive-locked-value="<%= @participant&.interactively_locked? %>">
+     data-chat-interactive-locked-value="<%= @participant&.interactively_locked? %>"
+     data-user-inbox-user-id-value="<%= current_user.id %>">
 
   <%# SIDEBAR (reloaded with current conversation highlighted) %>
   <div class="w-[400px] min-w-[400px] flex flex-col border-r border-[#2a3942] bg-[#111b21]">
@@ -30,7 +31,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10" />
           </svg>
         <% end %>
-        <% if current_user.role_admin? %>
+        <% if current_user.role_admin? || current_user.company_attendants.supervisors.any? %>
           <%= link_to admin_root_path, class: "p-2 rounded-full hover:bg-[#2a3942] transition-colors", title: "Admin" do %>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00a884]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -61,7 +62,7 @@
     <%# Conversations list %>
     <div class="flex-1 overflow-y-auto" data-controller="conversation-search">
       <% current_user.conversations.includes(:users, :messages).recent.each do |convo| %>
-        <div class="<%= 'bg-[#2a3942]' if convo.id == @conversation.id %>">
+        <div id="conversation-item-wrapper-<%= convo.id %>" class="<%= 'bg-[#2a3942]' if convo.id == @conversation.id %>">
           <%= render "conversations/conversation_item", conversation: convo, current_user: current_user %>
         </div>
       <% end %>
@@ -260,6 +261,29 @@
     <%# Message input area — file-preview controller must wrap the input for change->file-preview#showPreview %>
     <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942]" data-controller="file-preview">
 
+      <%# Reply banner — shown when user taps "Responder" on a message %>
+      <div id="reply-banner"
+           style="display:none;"
+           class="flex items-center gap-2 mb-2 px-3 py-2 bg-[#2a3942] rounded-xl border-l-4 border-[#00a884]">
+        <%# Thumbnail (for images/stickers) %>
+        <img id="reply-banner-thumb" src="" alt="" style="display:none;"
+             class="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
+        <%# Text preview %>
+        <div class="flex-1 min-w-0">
+          <p id="reply-banner-name" class="text-[#00a884] text-xs font-semibold truncate"></p>
+          <p id="reply-banner-text" class="text-[#8696a0] text-xs truncate"></p>
+        </div>
+        <%# Close (cancel reply) %>
+        <button type="button"
+                onclick="document.getElementById('reply-banner').style.display='none'; document.getElementById('reply-to-id-field').value='';"
+                class="text-[#8696a0] hover:text-white flex-shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors"
+                title="Cancelar resposta">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
       <%# File preview %>
       <div id="file-preview" class="hidden mb-3 p-3 bg-[#2a3942] rounded-lg flex flex-wrap items-center gap-3">
         <div id="file-preview-content" class="flex-1 flex flex-wrap gap-3 min-w-0"></div>
@@ -274,20 +298,69 @@
                     url: conversation_messages_path(@conversation, format: :turbo_stream),
                     method: :post,
                     data: {
+                      controller: "composer-emoji",
+                      composer_emoji_emojis_value: MessageReaction::ALLOWED_EMOJIS,
                       chat_target: "form",
                       action: "submit->chat#submitForm turbo:submit-end->chat#resetForm"
                     },
                     class: "flex items-end gap-2" do |f| %>
         <%# client_message_id: um por envio; servidor usa para idempotência (evitar duplicata do mesmo envio) %>
         <%= f.hidden_field :client_message_id, value: "", data: { chat_target: "clientMessageId" } %>
+        <%# reply_to_id: preenchido pelo reply_controller quando o usuário toca "Responder" %>
+        <%= f.hidden_field :reply_to_id, value: "", id: "reply-to-id-field" %>
 
-        <%# Emoji button — TODO %>
-        <button type="button" class="p-2 text-[#8696a0] hover:text-white transition-colors flex-shrink-0 mb-1"
-                title="Emoji (em breve)">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
+        <%# Emoji picker (composer) %>
+        <div class="relative flex-shrink-0 mb-1">
+          <button type="button"
+                  data-action="click->composer-emoji#toggle"
+                  class="p-2 text-[#8696a0] hover:text-white transition-colors"
+                  title="Emoji">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          <div data-composer-emoji-target="panel"
+               class="hidden absolute bottom-full mb-2 left-0 bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex items-center gap-1 z-40 max-w-[min(90vw,22rem)]">
+            <div class="flex items-center gap-1 flex-wrap" data-composer-emoji-target="favorites"></div>
+            <button type="button"
+                    data-action="click->composer-emoji#openMore"
+                    class="ml-1 px-2 py-1 rounded-lg border border-[#2a3942] text-xs text-[#8696a0] hover:text-white hover:bg-[#2a3942] transition-colors">
+              Mais
+            </button>
+          </div>
+        </div>
+
+        <%# Emoji modal (all emojis) %>
+        <div data-composer-emoji-target="modal"
+             class="hidden fixed inset-0 z-[100] flex items-center justify-center px-4"
+             aria-modal="true" role="dialog">
+          <div class="absolute inset-0 bg-black/60"></div>
+          <div class="relative w-full max-w-md bg-[#202c33] border border-[#2a3942] rounded-2xl shadow-2xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-white text-sm font-medium">Emojis</p>
+              <button type="button" data-action="click->composer-emoji#close" class="text-[#8696a0] hover:text-white">✕</button>
+            </div>
+            <div class="max-h-[60vh] overflow-y-auto pr-1 space-y-3">
+              <% MessageReaction::EMOJI_CATEGORIES.each do |category, emojis| %>
+                <% next if category == "Recentes / Favoritos" %>
+                <div>
+                  <p class="text-[#8696a0] text-xs font-semibold uppercase tracking-wide mb-2"><%= category %></p>
+                  <div class="flex flex-wrap gap-1">
+                    <% emojis.each do |emoji| %>
+                      <button type="button"
+                              data-action="click->composer-emoji#pick"
+                              data-emoji="<%= emoji %>"
+                              class="text-2xl hover:scale-125 transition-transform p-2 rounded-xl hover:bg-[#2a3942]">
+                        <%= emoji %>
+                      </button>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+            <p class="mt-2 text-[#8696a0] text-xs">Dica: clique num emoji para inserir. Seus últimos usados viram favoritos.</p>
+          </div>
+        </div>
 
         <%# Attachment button %>
         <label class="p-2 text-[#8696a0] hover:text-white transition-colors cursor-pointer flex-shrink-0 mb-1"
@@ -301,6 +374,34 @@
                 multiple: true %>
         </label>
 
+        <%# Sticker / GIF button (trigger only; panel is a fixed bottom-sheet) %>
+        <div data-controller="sticker-picker"
+             data-sticker-picker-send-path-value="<%= send_sticker_conversation_messages_path(@conversation) %>"
+             data-sticker-picker-stickers-path-value="<%= stickers_path(format: :json) %>"
+             data-sticker-picker-giphy-key-value="<%= ENV['GIPHY_API_KEY'].to_s %>"
+             class="relative flex-shrink-0 mb-1">
+
+          <button type="button"
+                  data-action="click->sticker-picker#toggle"
+                  class="p-2 text-[#8696a0] hover:text-white transition-colors"
+                  title="Figurinhas & GIFs">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9.5L14.5 2z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2v6h6"/>
+              <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17c1.5-1.5 3-1.5 3 0"/>
+            </svg>
+          </button>
+
+          <%# Hidden file input — lives here so Stimulus can find it as target %>
+          <input type="file"
+                 data-sticker-picker-target="uploadInput"
+                 data-action="change->sticker-picker#onFileSelect"
+                 accept="image/png,image/jpeg,image/gif,image/webp"
+                 multiple class="hidden" />
+        </div>
+
         <%# Text input %>
         <div class="flex-1 bg-[#2a3942] rounded-2xl px-4 py-2">
           <%= f.text_area :content,
@@ -308,6 +409,7 @@
                 placeholder: "Digite uma mensagem",
                 class: "w-full bg-transparent text-white placeholder-[#8696a0] text-sm outline-none resize-none max-h-32 leading-5",
                 data: {
+                  "composer-emoji-target": "input",
                   chat_target: "input",
                   action: "keydown->chat#handleKeydown input->chat#autoResize input->typing#handleTyping"
                 } %>
@@ -323,6 +425,252 @@
           </svg>
         </button>
       <% end %>
+    </div>
+  </div>
+
+  <%# ── Sticker editor modal ────────────────────────────────────────────────── %>
+  <div id="sticker-crop-modal"
+       style="display:none; position:fixed; inset:0; z-index:600; align-items:center; justify-content:center; flex-direction:column;"
+       aria-modal="true" role="dialog">
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px);"></div>
+
+    <div style="position:relative; margin:auto; width:100%; max-width:36rem; max-height:93vh; background:#1d2b32; border-radius:1rem; box-shadow:0 25px 60px rgba(0,0,0,0.7); display:flex; flex-direction:column; overflow:hidden;">
+
+      <%# Header %>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #2a3942; flex-shrink:0;">
+        <p style="color:#fff; font-weight:600; font-size:14px; margin:0;">Editor de figurinha</p>
+        <button type="button" id="sticker-crop-close"
+                style="color:#8696a0; background:none; border:none; cursor:pointer; font-size:20px; line-height:1; padding:4px;">✕</button>
+      </div>
+
+      <%# Tool tabs %>
+      <div style="display:flex; border-bottom:1px solid #2a3942; flex-shrink:0;">
+        <button type="button" id="editor-tab-crop"
+                style="flex:1; padding:8px 0; font-size:12px; font-weight:600; color:#fff; border-bottom:2px solid #00a884; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+          ✂️ Recortar
+        </button>
+        <button type="button" id="editor-tab-erase"
+                style="flex:1; padding:8px 0; font-size:12px; font-weight:600; color:#8696a0; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+          🖌️ Borracha
+        </button>
+        <button type="button" id="editor-tab-bg"
+                style="flex:1; padding:8px 0; font-size:12px; font-weight:600; color:#8696a0; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+          🪄 Remover fundo
+        </button>
+      </div>
+
+      <%# ── CROP TOOL ── %>
+      <div id="editor-pane-crop" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+        <%# Shape toggle %>
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid #2a3942; flex-shrink:0;">
+          <span style="color:#8696a0; font-size:12px;">Forma:</span>
+          <button type="button" id="crop-shape-free"
+                  style="padding:3px 12px; border-radius:8px; font-size:12px; font-weight:500; background:#00a884; color:#fff; border:none; cursor:pointer;">Livre</button>
+          <button type="button" id="crop-shape-square"
+                  style="padding:3px 12px; border-radius:8px; font-size:12px; font-weight:500; background:#2a3942; color:#8696a0; border:none; cursor:pointer;">Quadrado</button>
+          <button type="button" id="crop-shape-circle"
+                  style="padding:3px 12px; border-radius:8px; font-size:12px; font-weight:500; background:#2a3942; color:#8696a0; border:none; cursor:pointer;">Círculo</button>
+          <span style="margin-left:auto; color:#8696a0; font-size:10px;">Arraste · Scroll = zoom</span>
+        </div>
+        <div style="flex:1; min-height:280px; background:#0b141a; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <img id="sticker-crop-img" src="" alt="" style="display:none; max-width:100%;" />
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-top:1px solid #2a3942; flex-shrink:0; gap:8px;">
+          <button type="button" id="sticker-crop-reset"
+                  style="padding:6px 12px; border-radius:10px; font-size:12px; color:#8696a0; border:1px solid #2a3942; background:none; cursor:pointer;">
+            Resetar
+          </button>
+          <div style="display:flex; gap:8px; margin-left:auto;">
+            <button type="button" id="sticker-crop-save"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#2a3942; color:#fff; border:none; cursor:pointer;">
+              Salvar
+            </button>
+            <button type="button" id="sticker-crop-send"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#00a884; color:#fff; border:none; cursor:pointer;">
+              Salvar e enviar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <%# ── ERASE TOOL ── %>
+      <div id="editor-pane-erase" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+        <%# Toolbar %>
+        <div style="display:flex; align-items:center; gap:12px; padding:8px 16px; border-bottom:1px solid #2a3942; flex-shrink:0; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#8696a0; font-size:12px;">Tamanho:</span>
+            <input type="range" id="eraser-size" min="4" max="80" value="20"
+                   style="width:96px; accent-color:#00a884;" />
+            <span id="eraser-size-label" style="color:#fff; font-size:12px; width:24px;">20</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+            <button type="button" id="eraser-undo"
+                    style="padding:4px 8px; border-radius:8px; font-size:12px; color:#8696a0; border:1px solid #2a3942; background:none; cursor:pointer;">
+              ↩ Desfazer
+            </button>
+            <button type="button" id="eraser-clear"
+                    style="padding:4px 8px; border-radius:8px; font-size:12px; color:#f87171; border:1px solid rgba(248,113,113,0.3); background:none; cursor:pointer;">
+              Limpar tudo
+            </button>
+          </div>
+        </div>
+        <%# Canvas area %>
+        <div style="flex:1; min-height:280px; background:#0b141a; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:none;">
+          <canvas id="eraser-canvas"
+                  style="display:block; touch-action:none; max-width:100%; max-height:100%;"></canvas>
+          <div id="eraser-cursor"
+               style="display:none; pointer-events:none; position:fixed; border-radius:50%; border:2px solid rgba(255,255,255,0.7); background:transparent; width:20px; height:20px; transform:translate(-50%,-50%);"></div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-top:1px solid #2a3942; flex-shrink:0; gap:8px;">
+          <span style="color:#8696a0; font-size:12px;">Pinte sobre o que quer apagar</span>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="eraser-save"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#2a3942; color:#fff; border:none; cursor:pointer;">
+              Salvar
+            </button>
+            <button type="button" id="eraser-send"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#00a884; color:#fff; border:none; cursor:pointer;">
+              Salvar e enviar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <%# ── BG REMOVE TOOL ── %>
+      <div id="editor-pane-bg" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:12px; padding:8px 16px; border-bottom:1px solid #2a3942; flex-shrink:0; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#8696a0; font-size:12px;">Tolerância:</span>
+            <input type="range" id="bg-tolerance" min="5" max="100" value="30"
+                   style="width:96px; accent-color:#00a884;" />
+            <span id="bg-tolerance-label" style="color:#fff; font-size:12px; width:24px;">30</span>
+          </div>
+          <span style="color:#8696a0; font-size:12px; margin-left:8px;">Clique no fundo para remover</span>
+          <button type="button" id="bg-undo"
+                  style="margin-left:auto; padding:4px 8px; border-radius:8px; font-size:12px; color:#8696a0; border:1px solid #2a3942; background:none; cursor:pointer;">
+            ↩ Desfazer
+          </button>
+        </div>
+        <div style="flex:1; min-height:280px; background:#0b141a; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <canvas id="bg-canvas"
+                  style="display:block; max-width:100%; max-height:100%; cursor:crosshair;"></canvas>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-top:1px solid #2a3942; flex-shrink:0; gap:8px;">
+          <span style="color:#8696a0; font-size:12px;">Clique nas áreas de fundo para torná-las transparentes</span>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="bg-save"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#2a3942; color:#fff; border:none; cursor:pointer;">
+              Salvar
+            </button>
+            <button type="button" id="bg-send"
+                    style="padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; background:#00a884; color:#fff; border:none; cursor:pointer;">
+              Salvar e enviar
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<%# ── Sticker overlay + bottom-sheet panel — outside every container so fixed positioning works ── %>
+<div id="sticker-overlay"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:390; pointer-events:none;"></div>
+
+<div id="sticker-panel"
+     style="display:none; position:fixed; bottom:0; left:0; right:0; height:70vh; z-index:400; flex-direction:column; background:#1d2b32; border-top:1px solid #2a3942; border-radius:1.25rem 1.25rem 0 0; box-shadow:0 -8px 40px rgba(0,0,0,0.5);">
+
+  <%# Drag handle %>
+  <div style="display:flex; justify-content:center; padding:8px 0 4px; flex-shrink:0; cursor:grab;">
+    <div style="width:40px; height:4px; border-radius:2px; background:#3d4a52;"></div>
+  </div>
+
+  <%# Tab bar %>
+  <div style="display:flex; align-items:center; border-bottom:1px solid #2a3942; flex-shrink:0; padding:0 8px; gap:4px;">
+    <button type="button" id="sp-tab-my"
+            style="flex:1; padding:10px 0; font-size:14px; font-weight:600; color:#fff; border-bottom:2px solid #00a884; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer;">
+      😄 Minhas
+    </button>
+    <button type="button" id="sp-tab-sticker"
+            style="flex:1; padding:10px 0; font-size:14px; font-weight:600; color:#8696a0; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer;">
+      ✨ Stickers
+    </button>
+    <button type="button" id="sp-tab-gif"
+            style="flex:1; padding:10px 0; font-size:14px; font-weight:600; color:#8696a0; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer;">
+      🎬 GIFs
+    </button>
+    <div style="display:flex; align-items:center; gap:4px; padding-left:8px; padding-right:4px; flex-shrink:0;">
+      <button type="button" id="sp-import-btn"
+              style="color:#00a884; font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #00a884; background:none; cursor:pointer; font-weight:600; white-space:nowrap;">
+        + Importar
+      </button>
+      <button type="button" id="sp-close-btn"
+              style="color:#8696a0; background:none; border:none; cursor:pointer; font-size:20px; line-height:1; padding:4px;">✕</button>
+    </div>
+  </div>
+
+  <%# Progress bar %>
+  <div id="sp-progress" style="display:none; padding:8px 16px; flex-shrink:0; border-bottom:1px solid #2a3942;">
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:#8696a0; margin-bottom:4px;">
+      <span id="sp-progress-label">Importando…</span>
+      <span id="sp-progress-count"></span>
+    </div>
+    <div style="width:100%; background:#2a3942; border-radius:4px; height:6px;">
+      <div id="sp-progress-bar" style="width:0%; background:#00a884; height:6px; border-radius:4px; transition:width 0.3s;"></div>
+    </div>
+  </div>
+
+  <%# MY STICKERS pane %>
+  <div id="sp-pane-my" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+    <p style="color:#8696a0; font-size:12px; padding:8px 16px 4px; flex-shrink:0;">
+      Clique para enviar · Passe o mouse para editar/apagar
+    </p>
+    <div id="sp-grid"
+         style="overflow-y:auto; flex:1; padding:12px 12px 20px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); align-content:start;">
+      <p style="color:#8696a0;font-size:12px;text-align:center;grid-column:1/-1;padding:32px 0;">Carregando…</p>
+    </div>
+  </div>
+
+  <%# GIPHY STICKERS pane %>
+  <div id="sp-pane-sticker" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+    <div style="padding:8px 16px; flex-shrink:0; border-bottom:1px solid #2a3942;">
+      <div style="display:flex; align-items:center; background:#2a3942; border-radius:12px; padding:8px 12px; gap:8px;">
+        <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;color:#8696a0;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input type="text" id="sp-sticker-search" placeholder="Buscar stickers (GIPHY)…"
+               style="background:none; color:#fff; font-size:14px; outline:none; width:100%; border:none;" />
+      </div>
+    </div>
+    <div id="sp-sticker-grid"
+         style="overflow-y:auto; padding:12px; display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); align-content:start; flex:1;">
+      <p style="color:#8696a0;font-size:12px;text-align:center;grid-column:1/-1;padding:32px 0;">Carregando stickers…</p>
+    </div>
+    <div style="flex-shrink:0; padding:6px 16px; border-top:1px solid #2a3942; display:flex; align-items:center; justify-content:flex-end; gap:4px;">
+      <span style="color:#8696a0;font-size:10px;">Powered by</span>
+      <span style="color:#fff;font-size:10px;font-weight:700;letter-spacing:0.05em;">GIPHY</span>
+    </div>
+  </div>
+
+  <%# GIF pane %>
+  <div id="sp-pane-gif" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+    <div style="padding:8px 16px; flex-shrink:0; border-bottom:1px solid #2a3942;">
+      <div style="display:flex; align-items:center; background:#2a3942; border-radius:12px; padding:8px 12px; gap:8px;">
+        <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;color:#8696a0;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input type="text" id="sp-gif-search" placeholder="Buscar GIFs…"
+               style="background:none; color:#fff; font-size:14px; outline:none; width:100%; border:none;" />
+      </div>
+    </div>
+    <div id="sp-gif-grid"
+         style="overflow-y:auto; padding:12px; display:grid; gap:8px; grid-template-columns:1fr 1fr; align-content:start; flex:1;">
+      <p style="color:#8696a0;font-size:12px;text-align:center;grid-column:1/-1;padding:32px 0;">Carregando GIFs em alta…</p>
+    </div>
+    <div style="flex-shrink:0; padding:6px 16px; border-top:1px solid #2a3942; display:flex; align-items:center; justify-content:flex-end; gap:4px;">
+      <span style="color:#8696a0;font-size:10px;">Powered by</span>
+      <span style="color:#fff;font-size:10px;font-weight:700;letter-spacing:0.05em;">GIPHY</span>
     </div>
   </div>
 </div>

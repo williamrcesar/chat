@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_18_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -234,6 +234,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
     t.index ["user_id"], name: "index_read_receipts_on_user_id"
   end
 
+  create_table "stickers", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_stickers_on_user_id"
+  end
+
   create_table "templates", force: :cascade do |t|
     t.string "name", null: false
     t.string "category", default: "general", null: false
@@ -314,6 +322,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_03_08_120000) do
   add_foreign_key "participants", "users"
   add_foreign_key "read_receipts", "messages"
   add_foreign_key "read_receipts", "users"
+  add_foreign_key "stickers", "users"
   add_foreign_key "templates", "users", column: "created_by_id"
   add_foreign_key "web_push_subscriptions", "users"
 end

@@ -515,6 +515,7 @@ Ao enviar uma mensagem, nos logs deve aparecer algo como:
 - [x] **Real-time Kanban board** for campaign delivery tracking ✅
 - [x] **Interactive Message Lock** (24h block until button/list clicked) ✅
 - [x] **Company Multi-Agent Inbox** (departments, routing, supervisor dashboard) ✅
+- [x] **Admin: monitor and impersonate conversations** (view all ongoing conversations, read-only or respond as attendant) ✅
 - [ ] **Disappearing messages**
 - [ ] **Stories / Status**#
 - [ ] **Block users**
@@ -526,6 +527,25 @@ Ao enviar uma mensagem, nos logs deve aparecer algo como:
 - [ ] **AI attendant integration** (connect `attendant_type: :ai` to an LLM API)
 - [ ] **SLA timers** (alert supervisor when ticket is unanswered too long)
 - [ ] **Company analytics** (response time, CSAT score)
+
+---
+
+## Admin: monitor and impersonate conversations
+
+Users with **admin** role or **company supervisors** can open the Admin area and go to **Conversas** to see ongoing conversations:
+
+- **Global scope** (admin only): conversations with recent activity (configurable time window), with search by user name/nickname.
+- **Company scope**: open tickets (pending/active/queued) for a company; supervisors see only their company.
+
+From the list, **Ver chat** opens a three-column panel:
+
+- **Left**: list of conversations in the current scope.
+- **Center**: live message thread (ActionCable). Two modes:
+  - **Monitor**: read-only; new messages appear in real time.
+  - **Impersonate**: choose a participant (e.g. the attendant) and send messages as them. The message is stored with `sender_id` of the impersonated user and `metadata["impersonated"] => true`, `metadata["admin_id"] => current_user.id` for audit.
+- **Right**: conversation and ticket details (company, status, attendant).
+
+Supervisors can only impersonate attendants of their company. From the **Company Dashboard** (Kanban), the link **Ver chat (admin)** opens that conversation in the admin panel in monitor mode.
 
 ---
 

@@ -139,6 +139,38 @@ class MessagesController < ApplicationController
     end
   end
 
+  def send_sticker
+    @message = @conversation.messages.new(
+      sender:       current_user,
+      content:      nil,
+      message_type: :sticker,
+      metadata:     {}
+    )
+
+    if params[:sticker_id].present?
+      sticker = current_user.stickers.find_by(id: params[:sticker_id])
+      return head(:not_found) unless sticker
+      @message.attachment.attach(sticker.image.blob)
+    elsif params[:sticker_file].present?
+      @message.attachment.attach(params[:sticker_file])
+    else
+      return head(:unprocessable_entity)
+    end
+
+    @message.save!
+
+    @conversation.touch
+    @message.mark_sent!
+    mark_delivered_if_recipient_online!(@message)
+    broadcast_new_message_to_recipients(@message)
+    @conversation.participants.find_by(user: current_user)&.mark_read!
+
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to conversation_path(@conversation) }
+    end
+  end
+
   def from_template
     template = Template.find(params[:template_id])
     rendered_content = template.render_with(params[:variables] || {})
@@ -266,5 +298,34 @@ class MessagesController < ApplicationController
       ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html, message_id: message.id })
     end
     message.update!(metadata: (message.metadata || {}).merge("new_message_sent_at" => Time.current.utc.iso8601))
+    broadcast_sidebar_update(message)
+  end
+
+  # Broadcasts sidebar update (conversation list preview) to ALL participants synchronously
+  # so the UI updates immediately without depending on Sidekiq being available.
+  def broadcast_sidebar_update(message)
+    conversation = message.conversation
+    renderer = ApplicationController.renderer.new(
+      http_host: Rails.application.config.action_mailer.default_url_options&.dig(:host) || "localhost",
+      https:     Rails.env.production?
+    )
+    conversation.participants.includes(:user).each do |participant|
+      item_html = renderer.render(
+        partial: "conversations/conversation_item",
+        locals:  { conversation: conversation, current_user: participant.user }
+      )
+      preview_html = renderer.render(
+        partial: "conversations/conversation_item_preview",
+        locals:  { conversation: conversation, current_user: participant.user }
+      )
+      UserChannel.broadcast_to(participant.user, {
+        type:            "conversation_updated",
+        conversation_id: conversation.id,
+        item_html:       item_html,
+        preview_html:    preview_html
+      })
+    end
+  rescue => e
+    Rails.logger.error("[broadcast_sidebar_update] Error: #{e.class} #{e.message}\n#{e.backtrace&.first(5)&.join("\n")}")
   end
 end

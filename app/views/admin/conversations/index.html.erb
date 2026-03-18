@@ -1,9 +1,55 @@
-<% content_for :title, "Conversas" %>
+<% content_for :title, "Conversas em andamento" %>
 
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-white">Conversas</h1>
+<div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+  <h1 class="text-2xl font-bold text-white">Conversas em andamento</h1>
   <span class="text-[#8b949e] text-sm"><%= @pagy.count %> total</span>
 </div>
+
+<%# Filtros %>
+<%= form_with url: admin_conversations_path, method: :get, class: "flex flex-wrap items-end gap-3 mb-6 p-4 bg-[#161b22] border border-[#30363d] rounded-xl" do |f| %>
+  <% if current_user.role_admin? %>
+    <div>
+      <label class="block text-[#8b949e] text-xs mb-1">Escopo</label>
+      <select name="scope" class="bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-white">
+        <option value="global" <%= "selected" if params[:scope] != "company" %>>Global</option>
+        <option value="company" <%= "selected" if params[:scope] == "company" %>>Por empresa</option>
+      </select>
+    </div>
+    <% if params[:scope] == "company" %>
+      <div>
+        <label class="block text-[#8b949e] text-xs mb-1">Empresa</label>
+        <select name="company_id" class="bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-white min-w-[180px]">
+          <option value="">— Selecionar —</option>
+          <% Company.order(:name).each do |c| %>
+            <option value="<%= c.id %>" <%= "selected" if params[:company_id].to_s == c.id.to_s %>><%= c.name %></option>
+          <% end %>
+        </select>
+      </div>
+    <% end %>
+  <% end %>
+  <% if params[:scope] == "company" || !current_user.role_admin? %>
+    <div>
+      <label class="block text-[#8b949e] text-xs mb-1">Status</label>
+      <select name="status" class="bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-white">
+        <option value="">Todos</option>
+        <% ConversationAssignment.statuses.each_key do |s| %>
+          <option value="<%= s %>" <%= "selected" if params[:status] == s %>><%= s %></option>
+        <% end %>
+      </select>
+    </div>
+  <% end %>
+  <% if params[:scope] != "company" && current_user.role_admin? %>
+    <div>
+      <label class="block text-[#8b949e] text-xs mb-1">Buscar (nome/@nickname)</label>
+      <input type="text" name="search" value="<%= params[:search] %>" placeholder="Buscar..." class="bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-white placeholder-[#8b949e] min-w-[160px]">
+    </div>
+    <div>
+      <label class="block text-[#8b949e] text-xs mb-1">Últimos (minutos)</label>
+      <input type="number" name="minutes" value="<%= params[:minutes].presence || 1440 %>" min="60" class="bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-white w-24">
+    </div>
+  <% end %>
+  <button type="submit" class="px-4 py-2 bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-medium rounded-lg transition-colors">Filtrar</button>
+<% end %>
 
 <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
   <table class="w-full text-sm">
@@ -12,6 +58,7 @@
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">ID</th>
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Nome</th>
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Tipo</th>
+        <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Ticket / Status</th>
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Participantes</th>
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Mensagens</th>
         <th class="text-left px-4 py-3 text-[#8b949e] text-xs font-semibold uppercase tracking-wide">Última atividade</th>
@@ -22,22 +69,32 @@
       <% @conversations.each do |convo| %>
         <tr class="hover:bg-[#21262d] transition-colors">
           <td class="px-4 py-3 text-[#8b949e] text-xs">#<%= convo.id %></td>
-          <td class="px-4 py-3 text-white"><%= convo.name || "(direto)" %></td>
+          <td class="px-4 py-3 text-white"><%= convo.display_name_for(current_user) %></td>
           <td class="px-4 py-3">
             <span class="text-xs px-2 py-0.5 rounded-full <%= convo.conversation_type_group? ? 'bg-blue-500/10 text-blue-400' : 'bg-[#30363d] text-[#8b949e]' %>">
               <%= convo.conversation_type %>
             </span>
+          </td>
+          <td class="px-4 py-3">
+            <% if convo.conversation_assignment.present? %>
+              <span class="text-xs px-2 py-0.5 rounded <%= convo.conversation_assignment.status_active? ? 'bg-[#00a884]/20 text-[#00a884]' : 'bg-[#30363d] text-[#8b949e]' %>"><%= convo.conversation_assignment.status %></span>
+              <span class="text-[#8b949e] text-xs ml-1"><%= convo.conversation_assignment.company.name %></span>
+            <% else %>
+              <span class="text-[#8b949e]">—</span>
+            <% end %>
           </td>
           <td class="px-4 py-3 text-[#8b949e]"><%= convo.participants.size %></td>
           <td class="px-4 py-3 text-[#8b949e]"><%= convo.messages.count %></td>
           <td class="px-4 py-3 text-[#8b949e] text-xs"><%= convo.updated_at.strftime("%d/%m %H:%M") %></td>
           <td class="px-4 py-3">
             <div class="flex gap-2">
-              <%= link_to "Ver", admin_conversation_path(convo), class: "text-[#58a6ff] text-xs hover:underline" %>
-              <%= button_to admin_conversation_path(convo), method: :delete,
-                    data: { turbo_confirm: "Remover esta conversa e todas as mensagens?" },
-                    class: "text-xs text-red-400 hover:text-red-300 transition-colors" do %>
-                Remover
+              <%= link_to "Ver chat", admin_conversation_path(convo, mode: "monitor", scope: params[:scope], company_id: params[:company_id]), class: "text-[#58a6ff] text-xs hover:underline" %>
+              <% if current_user.role_admin? %>
+                <%= button_to admin_conversation_path(convo), method: :delete,
+                      data: { turbo_confirm: "Remover esta conversa e todas as mensagens?" },
+                      class: "text-xs text-red-400 hover:text-red-300 transition-colors" do %>
+                  Remover
+                <% end %>
               <% end %>
             </div>
           </td>

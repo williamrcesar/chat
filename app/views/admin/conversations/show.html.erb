@@ -1,61 +1,250 @@
-<% content_for :title, "Conversa ##{@conversation.id}" %>
+<% content_for :title, "Conversa ##{@conversation.id} — Admin" %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
 
-<div class="flex items-center gap-4 mb-6">
-  <%= link_to "← Conversas", admin_conversations_path, class: "text-[#58a6ff] hover:underline text-sm" %>
-</div>
+<div class="flex h-screen bg-[#0d1117] border-t border-[#30363d]"
+     data-controller="chat"
+     data-chat-conversation-id-value="<%= @conversation.id %>"
+     data-chat-interactive-locked-value="false">
 
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-  <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6">
-    <h2 class="text-white font-semibold mb-4">Detalhes</h2>
-    <div class="space-y-3 text-sm">
-      <div><span class="text-[#8b949e]">Nome:</span> <span class="text-white ml-2"><%= @conversation.name || "—" %></span></div>
-      <div><span class="text-[#8b949e]">Tipo:</span> <span class="text-white ml-2"><%= @conversation.conversation_type %></span></div>
-      <div><span class="text-[#8b949e]">Criada:</span> <span class="text-white ml-2"><%= @conversation.created_at.strftime("%d/%m/%Y") %></span></div>
-    </div>
-
-    <h3 class="text-white font-semibold mt-6 mb-3">Participantes</h3>
-    <div class="space-y-2">
-      <% @participants.each do |p| %>
-        <div class="flex items-center justify-between">
-          <span class="text-white text-sm"><%= p.user.display_name %></span>
-          <span class="text-[#8b949e] text-xs"><%= p.role %></span>
-        </div>
+  <%# Coluna esquerda: lista de conversas em andamento %>
+  <div class="w-[320px] min-w-[320px] flex flex-col border-r border-[#30363d] bg-[#161b22]">
+    <div class="px-4 py-3 border-b border-[#30363d] flex items-center justify-between">
+      <h2 class="text-white font-semibold text-sm">Conversas em andamento</h2>
+      <%= link_to admin_conversations_path(scope: params[:scope], company_id: params[:company_id], status: params[:status], attendant_id: params[:attendant_id]), class: "text-[#58a6ff] text-xs hover:underline" do %>
+        Ver todas
       <% end %>
     </div>
-
-    <div class="mt-6 pt-4 border-t border-[#30363d]">
-      <%= button_to admin_conversation_path(@conversation), method: :delete,
-            data: { turbo_confirm: "Remover esta conversa permanentemente?" },
-            class: "w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm hover:bg-red-500/20 transition-colors" do %>
-        Remover conversa
+    <div class="flex-1 overflow-y-auto">
+      <% @conversations_sidebar.each do |convo| %>
+        <div class="<%= 'bg-[#21262d]' if convo.id == @conversation.id %>">
+          <%= link_to admin_conversation_path(convo, mode: @admin_mode, scope: params[:scope], company_id: params[:company_id]), class: "flex items-center gap-3 px-4 py-3 hover:bg-[#21262d] border-b border-[#21262d] transition-colors", data: { turbo_frame: "_top" } do %>
+            <div class="w-10 h-10 rounded-full bg-[#30363d] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+              <%= convo.display_name_for(current_user).first.upcase rescue "?" %>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-white text-sm font-medium truncate"><%= convo.display_name_for(current_user) %></p>
+              <p class="text-[#8b949e] text-xs truncate">
+                <% if convo.conversation_assignment.present? %>
+                  <span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-[#21262d]"><%= convo.conversation_assignment.status %></span>
+                  <%= convo.conversation_assignment.company_attendant&.user&.display_name %>
+                <% else %>
+                  #<%= convo.id %>
+                <% end %>
+              </p>
+            </div>
+          <% end %>
+        </div>
       <% end %>
     </div>
   </div>
 
-  <div class="lg:col-span-3 bg-[#161b22] border border-[#30363d] rounded-xl p-6">
-    <h3 class="text-white font-semibold mb-4">Últimas 50 mensagens</h3>
-    <div class="space-y-2 max-h-[600px] overflow-y-auto">
-      <% @messages.each do |msg| %>
-        <div class="flex gap-3 p-3 rounded-lg hover:bg-[#21262d] transition-colors">
-          <div class="w-7 h-7 rounded-full bg-[#30363d] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 mt-0.5">
-            <%= msg.sender.display_name.first.upcase %>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-baseline gap-2 mb-0.5">
-              <span class="text-white text-sm font-medium"><%= msg.sender.display_name %></span>
-              <span class="text-[#8b949e] text-xs"><%= msg.created_at.strftime("%d/%m %H:%M") %></span>
-              <span class="text-[#8b949e] text-xs"><%= msg.message_type %></span>
-            </div>
-            <% if msg.deleted_for_everyone? %>
-              <p class="text-[#8b949e] text-sm italic">Mensagem apagada</p>
-            <% else %>
-              <p class="text-[#c9d1d9] text-sm break-words"><%= msg.content&.truncate(200) %></p>
-              <% if msg.attachment.attached? %>
-                <span class="text-[#58a6ff] text-xs">📎 <%= msg.attachment.filename %></span>
-              <% end %>
+  <%# Coluna central: mensagens em tempo real %>
+  <div class="flex-1 flex flex-col bg-[#0b141a] min-w-0">
+    <%# Banner modo admin %>
+    <div class="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-2">
+        <span class="text-amber-400 text-sm font-medium">Painel Admin</span>
+        <% if @admin_mode == "monitor" %>
+          <span class="bg-[#21262d] text-[#8b949e] text-xs px-2 py-0.5 rounded">Apenas monitorando</span>
+        <% else %>
+          <% u = User.find_by(id: @impersonate_user_id) %>
+          <span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded">Respondendo como <%= u ? u.display_name : '?' %><%= u&.nickname.present? ? " (@#{u.nickname})" : "" %></span>
+        <% end %>
+      </div>
+      <div class="flex items-center gap-2">
+        <%= link_to admin_conversation_path(@conversation, mode: "monitor", scope: params[:scope], company_id: params[:company_id]), class: "text-sm px-3 py-1 rounded #{@admin_mode == 'monitor' ? 'bg-[#30363d] text-white' : 'text-[#8b949e] hover:text-white hover:bg-[#21262d]'}" do %>
+          Apenas monitorar
+        <% end %>
+        <%= link_to admin_conversation_path(@conversation, mode: "impersonate", scope: params[:scope], company_id: params[:company_id]), class: "text-sm px-3 py-1 rounded #{@admin_mode == 'impersonate' ? 'bg-amber-500/20 text-amber-400' : 'text-[#8b949e] hover:text-amber-400 hover:bg-amber-500/10'}" do %>
+          Impersonar
+        <% end %>
+      </div>
+    </div>
+
+    <%# Trocar usuário no modo impersonate (mesmo após já ter selecionado um) %>
+    <% if @admin_mode == "impersonate" %>
+      <div class="px-4 py-2 bg-[#202c33] border-b border-[#2a3942]">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <p class="text-[#8b949e] text-sm">Responder como:</p>
+          <% if @impersonate_user_id.present? %>
+            <%= button_to mode_admin_conversation_path(@conversation),
+                  method: :patch,
+                  params: { mode: "impersonate", impersonate_user_id: "" },
+                  class: "text-xs px-2 py-1 rounded bg-[#21262d] text-[#8b949e] hover:text-white hover:bg-[#30363d] transition-colors" do %>
+              Limpar seleção
             <% end %>
-          </div>
+          <% end %>
         </div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <% @participants.each do |p| %>
+            <% next unless allowed_impersonate_participant?(p) %>
+            <% active = @impersonate_user_id.to_i == p.user_id %>
+            <%= button_to mode_admin_conversation_path(@conversation),
+                  method: :patch,
+                  params: { mode: "impersonate", impersonate_user_id: p.user_id },
+                  class: "px-3 py-1.5 rounded-lg border text-sm transition-colors #{active ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'border-[#30363d] text-[#c9d1d9] hover:bg-amber-500/20 hover:border-amber-500/40 hover:text-amber-400'}" do %>
+              <%= p.user.display_name %><%= p.user.nickname.present? ? " (@#{p.user.nickname})" : "" %>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <%# Cabeçalho da conversa %>
+    <div class="flex items-center gap-3 px-4 py-3 bg-[#202c33] border-b border-[#2a3942]">
+      <div class="w-10 h-10 rounded-full bg-[#30363d] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+        <%= @conversation.display_name_for(current_user).first.upcase rescue "?" %>
+      </div>
+      <div class="flex-1 min-w-0">
+        <h1 class="text-white font-medium text-sm"><%= @conversation.display_name_for(current_user) %></h1>
+        <p class="text-[#8696a0] text-xs">#<%= @conversation.id %> · <%= @participants.size %> participantes</p>
+      </div>
+    </div>
+
+    <%# Área de mensagens %>
+    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div class="flex-1 overflow-y-auto px-4 py-4 min-h-0" id="messages-container" data-controller="scroll-to-bottom" data-action="turbo:load->scroll-to-bottom#scroll" style="background-color: #0b141a;">
+        <div id="messages" data-chat-target="messages" class="min-w-0 flex flex-col">
+          <% prev_message = nil %>
+          <% @messages.each do |message| %>
+            <%= render "messages/message",
+                  message: message,
+                  current_user: current_user,
+                  viewer_user: @viewer_user,
+                  right_side_sender_ids: @right_side_sender_ids,
+                  same_sender_as_previous: (prev_message && prev_message.sender_id == message.sender_id),
+                  first_in_list: prev_message.nil? %>
+            <% prev_message = message %>
+          <% end %>
+        </div>
+        <div id="messages-bottom"></div>
+      </div>
+
+      <%# Input: só em modo impersonate com usuário selecionado %>
+      <% if @admin_mode == "impersonate" %>
+        <% if @impersonate_user_id.present? %>
+          <%= form_with url: send_message_admin_conversation_path(@conversation),
+                method: :post,
+                scope: :message,
+                data: { controller: "composer-emoji", composer_emoji_emojis_value: MessageReaction::ALLOWED_EMOJIS, chat_target: "form", action: "submit->chat#submitForm turbo:submit-end->chat#resetForm" },
+                class: "px-4 py-3 bg-[#202c33] border-t border-[#2a3942] flex items-end gap-2" do |f| %>
+            <%= f.hidden_field :client_message_id, value: "", data: { chat_target: "clientMessageId" } %>
+            <div class="relative flex-shrink-0 mb-1">
+              <button type="button"
+                      data-action="click->composer-emoji#toggle"
+                      class="p-2 text-[#8696a0] hover:text-white transition-colors"
+                      title="Emoji">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <div data-composer-emoji-target="panel"
+                   class="hidden absolute bottom-full mb-2 left-0 bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex items-center gap-1 z-40 max-w-[min(90vw,22rem)]">
+                <div class="flex items-center gap-1 flex-wrap" data-composer-emoji-target="favorites"></div>
+                <button type="button"
+                        data-action="click->composer-emoji#openMore"
+                        class="ml-1 px-2 py-1 rounded-lg border border-[#2a3942] text-xs text-[#8696a0] hover:text-white hover:bg-[#2a3942] transition-colors">
+                  Mais
+                </button>
+              </div>
+            </div>
+
+            <div data-composer-emoji-target="modal"
+                 class="hidden fixed inset-0 z-[100] flex items-center justify-center px-4"
+                 aria-modal="true" role="dialog">
+              <div class="absolute inset-0 bg-black/60"></div>
+              <div class="relative w-full max-w-md bg-[#202c33] border border-[#2a3942] rounded-2xl shadow-2xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-white text-sm font-medium">Emojis</p>
+                  <button type="button" data-action="click->composer-emoji#close" class="text-[#8696a0] hover:text-white">✕</button>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto pr-1 space-y-3">
+                  <% MessageReaction::EMOJI_CATEGORIES.each do |category, emojis| %>
+                    <% next if category == "Recentes / Favoritos" %>
+                    <div>
+                      <p class="text-[#8696a0] text-xs font-semibold uppercase tracking-wide mb-2"><%= category %></p>
+                      <div class="flex flex-wrap gap-1">
+                        <% emojis.each do |emoji| %>
+                          <button type="button"
+                                  data-action="click->composer-emoji#pick"
+                                  data-emoji="<%= emoji %>"
+                                  class="text-2xl hover:scale-125 transition-transform p-2 rounded-xl hover:bg-[#2a3942]">
+                            <%= emoji %>
+                          </button>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+                <p class="mt-2 text-[#8696a0] text-xs">Dica: clique num emoji para inserir. Seus últimos usados viram favoritos.</p>
+              </div>
+            </div>
+
+            <div class="flex-1 bg-[#2a3942] rounded-2xl px-4 py-2">
+              <%= f.text_area :content, rows: 1, placeholder: "Mensagem como #{User.find(@impersonate_user_id).display_name}...", class: "w-full bg-transparent text-white placeholder-[#8696a0] text-sm outline-none resize-none max-h-32 leading-5", data: { chat_target: "input", "composer-emoji-target": "input", action: "keydown->chat#handleKeydown input->chat#autoResize" } %>
+            </div>
+            <button type="submit" data-chat-target="submitButton" class="p-2 bg-[#00a884] hover:bg-[#02966f] text-white rounded-full transition-colors flex-shrink-0 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+            </button>
+          <% end %>
+        <% else %>
+          <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942]">
+            <p class="text-[#8b949e] text-sm">Selecione um usuário acima para enviar mensagens.</p>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="px-4 py-3 bg-[#202c33] border-t border-[#2a3942] text-[#8b949e] text-sm">
+          Modo monitor — não é possível enviar mensagens. Use "Impersonar" para responder como um participante.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Coluna direita: detalhes do ticket / conversa %>
+  <div class="w-[280px] min-w-[280px] flex flex-col border-l border-[#30363d] bg-[#161b22] overflow-y-auto">
+    <div class="p-4 border-b border-[#30363d]">
+      <h3 class="text-white font-semibold text-sm mb-3">Detalhes</h3>
+      <div class="space-y-2 text-sm">
+        <div><span class="text-[#8b949e]">ID:</span> <span class="text-white ml-2">#<%= @conversation.id %></span></div>
+        <div><span class="text-[#8b949e]">Tipo:</span> <span class="text-white ml-2"><%= @conversation.conversation_type %></span></div>
+        <div><span class="text-[#8b949e]">Nome:</span> <span class="text-white ml-2"><%= @conversation.name.presence || "—" %></span></div>
+      </div>
+    </div>
+    <% if @assignment.present? %>
+      <div class="p-4 border-b border-[#30363d]">
+        <h3 class="text-white font-semibold text-sm mb-3">Ticket</h3>
+        <div class="space-y-2 text-sm">
+          <div><span class="text-[#8b949e]">Empresa:</span> <span class="text-white ml-2"><%= @assignment.company.name %></span></div>
+          <div><span class="text-[#8b949e]">Status:</span> <span class="text-white ml-2"><%= @assignment.status %></span></div>
+          <div><span class="text-[#8b949e]">Atendente:</span> <span class="text-white ml-2"><%= @assignment.company_attendant&.user&.display_name || "—" %></span></div>
+          <div><span class="text-[#8b949e]">Departamento:</span> <span class="text-white ml-2"><%= @assignment.selected_department.presence || "—" %></span></div>
+        </div>
+        <%= link_to company_dashboard_path, class: "mt-3 inline-block text-[#58a6ff] text-xs hover:underline" do %>
+          Abrir no Dashboard →
+        <% end %>
+      </div>
+    <% end %>
+    <div class="p-4">
+      <h3 class="text-white font-semibold text-sm mb-3">Participantes</h3>
+      <div class="space-y-2">
+        <% @participants.each do |p| %>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-white truncate"><%= p.user.display_name %></span>
+            <span class="text-[#8b949e] text-xs"><%= p.role %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    <div class="p-4 pt-0 mt-auto">
+      <%= link_to admin_conversations_path(scope: params[:scope], company_id: params[:company_id]), class: "block w-full py-2 text-center bg-[#21262d] border border-[#30363d] rounded-lg text-sm text-[#c9d1d9] hover:bg-[#30363d] transition-colors" do %>
+        ← Voltar à lista
+      <% end %>
+      <% if current_user.role_admin? %>
+        <%= button_to admin_conversation_path(@conversation), method: :delete, data: { turbo_confirm: "Remover esta conversa permanentemente?" }, class: "mt-2 w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm hover:bg-red-500/20 transition-colors" do %>
+          Remover conversa
+        <% end %>
       <% end %>
     </div>
   </div>

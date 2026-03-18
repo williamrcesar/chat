@@ -37,8 +37,10 @@ class MessageBroadcastJob < ApplicationJob
     new_message_already_sent = meta["new_message_sent_at"].present?
 
     conversation.participants.each do |participant|
+      is_sender = participant.user_id == sender_id
+
       unless new_message_already_sent
-        next if participant.user_id == sender_id
+        next if is_sender
         html = ApplicationController.renderer.render(
           partial: "messages/message",
           locals: { message: message, current_user: participant.user }
@@ -46,19 +48,26 @@ class MessageBroadcastJob < ApplicationJob
         ChatChannel.broadcast_to([ conversation, participant.user ], { type: "new_message", message: html, message_id: message.id })
       end
 
-      # Update sidebar preview for all participants
-      preview_html = ApplicationController.renderer.render(
-        partial: "conversations/conversation_item_preview",
-        locals:  { conversation: conversation, current_user: participant.user }
-      )
-      UserChannel.broadcast_to(participant.user, {
-        type:            "conversation_updated",
-        conversation_id: conversation.id,
-        preview_html:    preview_html
-      })
+      # Update sidebar for recipients (sender already got update synchronously in controller)
+      unless is_sender
+        item_html = ApplicationController.renderer.render(
+          partial: "conversations/conversation_item",
+          locals:  { conversation: conversation, current_user: participant.user }
+        )
+        preview_html = ApplicationController.renderer.render(
+          partial: "conversations/conversation_item_preview",
+          locals:  { conversation: conversation, current_user: participant.user }
+        )
+        UserChannel.broadcast_to(participant.user, {
+          type:            "conversation_updated",
+          conversation_id: conversation.id,
+          item_html:       item_html,
+          preview_html:    preview_html
+        })
+      end
 
       # Web Push for recipients (not sender, not muted, with subscription)
-      next if participant.user_id == sender_id
+      next if is_sender
       next if participant.muted?
 
       if participant.user.web_push_subscriptions.none?
@@ -69,6 +78,21 @@ class MessageBroadcastJob < ApplicationJob
       push_payload = build_push_payload_for(message, participant)
       WebPushNotificationJob.perform_later(participant.user_id, push_payload)
       Rails.logger.info("[WebPush] Enqueued push for user_id=#{participant.user_id}")
+    end
+
+    # Broadcast to admin/supervisor viewers (read-only stream; render with current_user: nil)
+    unless new_message_already_sent
+      right_side_sender_ids = []
+      if conversation.is_company_conversation? && conversation.company_id.present?
+        attendant_ids = CompanyAttendant.where(company_id: conversation.company_id).pluck(:user_id)
+        owner_id = conversation.company&.owner_id
+        right_side_sender_ids = (attendant_ids + [ owner_id ]).compact.uniq
+      end
+      html_admin = ApplicationController.renderer.render(
+        partial: "messages/message",
+        locals: { message: message, current_user: nil, right_side_sender_ids: right_side_sender_ids }
+      )
+      ActionCable.server.broadcast("admin_conversation_#{conversation.id}", { type: "new_message", message: html_admin, message_id: message.id })
     end
 
     # Touch conversation so it bubbles to the top of the sidebar list
@@ -104,6 +128,7 @@ class MessageBroadcastJob < ApplicationJob
   end
 
   def push_body_for(message)
+    return "enviou uma figurinha" if message.type_sticker?
     if message.attachment.attached?
       base = case
              when message.image?    then "sent you an image"

@@ -24,9 +24,28 @@ export default class extends Controller {
   }
 
   handleReceived(data) {
-    if (data.type !== "conversation_updated" || data.conversation_id == null || !data.preview_html) return
-    const id = `conversation-preview-${String(data.conversation_id)}`
-    const el = document.getElementById(id)
-    if (el) el.outerHTML = data.preview_html
+    if (data.type !== "conversation_updated" || data.conversation_id == null) return
+    const cid = String(data.conversation_id)
+
+    if (data.item_html) {
+      // If wrapped (show.html.erb), replace inner content of wrapper
+      const wrapper = document.getElementById(`conversation-item-wrapper-${cid}`)
+      if (wrapper) {
+        // Preserve the active-highlight class on the wrapper
+        const wasActive = wrapper.classList.contains("bg-[#2a3942]")
+        wrapper.innerHTML = data.item_html
+        if (wasActive) wrapper.classList.add("bg-[#2a3942]")
+        return
+      }
+      // Direct item (index.html.erb) — replace the item itself
+      const item = document.getElementById(`conversation-item-${cid}`)
+      if (item) { item.outerHTML = data.item_html; return }
+    }
+
+    // Fallback: replace only the preview section (timestamp stays stale)
+    if (data.preview_html) {
+      const preview = document.getElementById(`conversation-preview-${cid}`)
+      if (preview) preview.outerHTML = data.preview_html
+    }
   }
 }
