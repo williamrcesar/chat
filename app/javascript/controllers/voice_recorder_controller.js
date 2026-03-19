@@ -57,18 +57,25 @@ export default class extends Controller {
     this._peakData    = []
     this._speedIdx    = 0      // index into SPEEDS array
 
-    this._boundMove = this._onPointerMove.bind(this)
-    this._boundUp   = this._onPointerUp.bind(this)
+    this._boundMove        = this._onPointerMove.bind(this)
+    this._boundUp          = this._onPointerUp.bind(this)
+    this._boundFileAttach  = () => this._syncButtons("__file__")
+    this._boundFileClear   = () => this._syncButtons()
+
+    document.addEventListener("file-preview:attached", this._boundFileAttach)
+    document.addEventListener("file-preview:cleared",  this._boundFileClear)
 
     requestAnimationFrame(() => this._syncButtons())
   }
 
   disconnect() {
+    document.removeEventListener("file-preview:attached", this._boundFileAttach)
+    document.removeEventListener("file-preview:cleared",  this._boundFileClear)
     this._abort()
     this._stopPreview()
   }
 
-  // ─── Text field sync ────────────────────────────────────────────────────
+  // ─── Text / file field sync ─────────────────────────────────────────────
 
   onInput(e) { this._syncButtons(e.target.value) }
 

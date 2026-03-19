@@ -20,25 +20,27 @@
      <% if client_msg_id.present? %>data-client-message-id="<%= client_msg_id %>"<% end %>>
 
   <%# Bubble: fixed max-width; emoji/sticker: shrink-wrap so justify-end/start works correctly %>
+  <% interactive_user = local_assigns[:viewer_user].presence || current_user %>
+  <%
+    msg_text        = message.deleted_for_everyone? ? "" : message.content.to_s
+    msg_sender_name = message.sender.display_name
+    msg_preview     = message.deleted_for_everyone? ? "Mensagem apagada" : message.content.to_s.truncate(80)
+    msg_is_sticker  = message.type_sticker?
+    msg_has_attach  = message.attachment.attached?
+    msg_attach_url  = msg_has_attach ? rails_blob_path(message.attachment) : ""
+    msg_thumb       = msg_has_attach && (message.image? || msg_is_sticker) ? rails_blob_path(message.attachment) : ""
+  %>
   <% if render_mode == :bubble %>
     <% wrapper_cls = "max-w-[min(65%,22rem)] w-full min-w-0" %>
   <% else %>
     <% wrapper_cls = "max-w-[min(80%,28rem)] w-auto" %>
   <% end %>
+
+
   <div class="<%= wrapper_cls %> relative flex flex-col" data-controller="emoji-picker">
 
     <%# Context menu — shown on hover -%>
-    <% interactive_user = local_assigns[:viewer_user].presence || current_user %>
     <% if interactive_user.present? %>
-    <%
-      msg_text        = message.deleted_for_everyone? ? "" : message.content.to_s
-      msg_sender_name = message.sender.display_name
-      msg_preview     = message.deleted_for_everyone? ? "Mensagem apagada" : message.content.to_s.truncate(80)
-      msg_is_sticker  = message.type_sticker?
-      msg_has_attach  = message.attachment.attached?
-      msg_attach_url  = msg_has_attach ? rails_blob_path(message.attachment) : ""
-      msg_thumb       = msg_has_attach && (message.image? || msg_is_sticker) ? rails_blob_path(message.attachment) : ""
-    %>
     <div class="context-menu-bar absolute <%= mine ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1' %> top-0 hidden group-hover/msg:flex items-center gap-0.5 z-10"
          data-controller="msg-options"
          data-msg-text="<%= h(msg_text) %>"
@@ -208,39 +210,12 @@
 
     <%# ── STICKER (no bubble) ──────────────────────────────────────────── %>
     <% if render_mode == :sticker %>
-      <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> py-1 relative group/sticker">
+      <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> py-1">
         <img src="<%= rails_blob_path(message.attachment) %>"
              alt="Figurinha"
              class="w-full max-w-[min(65%,22rem)] h-auto object-contain select-none block"
              loading="lazy" />
-
-        <%# Hover actions: download + save to my stickers %>
-        <div class="absolute top-2 <%= mine ? 'left-2' : 'right-2' %> hidden group-hover/sticker:flex items-center gap-1">
-          <%# Download %>
-          <a href="<%= rails_blob_path(message.attachment, disposition: :attachment) %>"
-             download
-             class="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
-             title="Baixar figurinha">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-          </a>
-          <%# Save to my stickers (only for stickers from others) %>
-          <% if !mine && interactive_user.present? %>
-            <button type="button"
-                    data-controller="sticker-save"
-                    data-sticker-save-url-value="<%= rails_blob_path(message.attachment) %>"
-                    data-action="click->sticker-save#save"
-                    class="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 text-white hover:bg-[#00a884]/80 transition-colors"
-                    title="Salvar nos meus stickers">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-              </svg>
-            </button>
-          <% end %>
-        </div>
       </div>
-      <%# Timestamp below sticker %>
       <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> items-center gap-1 mt-0.5 px-1">
         <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
         <%= render "messages/status_tick", message: message, mine: mine %>

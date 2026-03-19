@@ -16,8 +16,8 @@ export default class extends Controller {
     this._editingBlob    = null
     this._eraserHistory  = []
     this._bgHistory      = []
+    this._cropShape      = "free"
     this._boundOutside   = this._onDocClick.bind(this)
-    // Bind panel buttons once the DOM is ready
     requestAnimationFrame(() => this._bindPanelButtons())
   }
 
@@ -447,21 +447,33 @@ export default class extends Controller {
     this._currentEditStickerId = stickerId
     const modal = document.getElementById("sticker-crop-modal")
     if (!modal) return
-    // Show modal — just set display, the rest is in the HTML style attribute
     modal.style.display = "flex"
 
-    // Load image into crop tool
-    const cropImg = document.getElementById("sticker-crop-img")
-    if (cropImg) {
-      cropImg.src = dataUrl
-      cropImg.style.display = "block"
-    }
+    // Reset shape to "free" every time editor opens
+    this._cropShape   = "free"
+    this._cropperPending = true   // flag: onload will init cropper
+    this._destroyCropper()
 
-    // Load canvas tools
+    // Load canvas tools (eraser / bg-remove panels)
     this._loadCanvasImage(dataUrl)
 
-    // Switch to crop tab
+    // Switch to crop tab (must happen before image src is set so the pane is visible)
     this._switchEditorTab("crop")
+
+    // Load image into crop tool — init Cropper after image loads
+    const cropImg = document.getElementById("sticker-crop-img")
+    if (cropImg) {
+      cropImg.onload = () => {
+        this._cropperPending = false
+        this._initCropper()
+      }
+      cropImg.src           = dataUrl
+      cropImg.style.display = "block"
+      // If already loaded from cache, fire onload manually
+      if (cropImg.complete && cropImg.naturalWidth > 0) {
+        cropImg.onload()
+      }
+    }
   }
 
   _loadCanvasImage(dataUrl) {
@@ -544,7 +556,10 @@ export default class extends Controller {
       }
     })
     if (tab === "crop") {
-      requestAnimationFrame(() => this._initCropper())
+      // Only init if not already initialized and no pending init from onload
+      if (!this._cropperInst && !this._cropperPending) {
+        requestAnimationFrame(() => this._initCropper())
+      }
     } else {
       this._destroyCropper()
     }
@@ -556,41 +571,80 @@ export default class extends Controller {
     this._destroyCropper()
   }
 
-  // Crop tool (Cropper.js)
+  // ── Crop tool (Cropper.js) ──────────────────────────────────────────────
+
   _initCropper() {
     const img = document.getElementById("sticker-crop-img")
     if (!img || !img.src || img.src === window.location.href) return
+    // Cropper needs the image to be visible
+    img.style.display = "block"
     this._destroyCropper()
-    if (typeof Cropper !== "undefined") {
-      this._cropperInst = new Cropper(img, {
-        viewMode: 2,
-        autoCropArea: 0.9,
-        background: false,
-        movable: true,
-        zoomable: true,
-        scalable: false,
-        aspectRatio: NaN
-      })
-    }
+    if (typeof Cropper === "undefined") return
+
+    this._cropperInst = new Cropper(img, {
+      viewMode:     2,
+      autoCropArea: 0.85,
+      background:   false,
+      movable:      true,
+      zoomable:     true,
+      scalable:     false,
+      rotatable:    false,
+      aspectRatio:  NaN,
+      ready: () => {
+        this._setCropShape(this._cropShape || "free")
+      }
+    })
   }
 
   _destroyCropper() {
     if (this._cropperInst) { this._cropperInst.destroy(); this._cropperInst = null }
   }
 
+  // Find the Cropper.js crop-box elements — container is a sibling of img, not a parent
+  _getCropperEls() {
+    const wrap = document.getElementById("sticker-crop-img-wrap")
+    if (!wrap) return {}
+    return {
+      viewBox:   wrap.querySelector(".cropper-view-box"),
+      face:      wrap.querySelector(".cropper-face"),
+      cropBox:   wrap.querySelector(".cropper-crop-box"),
+      container: wrap.querySelector(".cropper-container"),
+    }
+  }
+
   _setCropShape(shape) {
-    const btns = { free: "crop-shape-free", square: "crop-shape-square", circle: "crop-shape-circle" }
-    Object.keys(btns).forEach(k => {
-      const btn = document.getElementById(btns[k])
+    // 1. Update button styles
+    const btnIds = { free: "crop-shape-free", square: "crop-shape-square", circle: "crop-shape-circle" }
+    Object.keys(btnIds).forEach(k => {
+      const btn = document.getElementById(btnIds[k])
       if (!btn) return
       const active = k === shape
-      btn.style.background = active ? "#00a884" : "#2a3942"
-      btn.style.color      = active ? "#fff"    : "#8696a0"
+      btn.style.background  = active ? "#00a884" : "#2a3942"
+      btn.style.color       = active ? "#fff"    : "#8696a0"
+      btn.style.border      = active ? "1px solid #00a884" : "1px solid transparent"
     })
-    if (!this._cropperInst) return
-    if (shape === "square")  this._cropperInst.setAspectRatio(1)
-    else if (shape === "free") this._cropperInst.setAspectRatio(NaN)
+
     this._cropShape = shape
+
+    if (!this._cropperInst) return
+
+    // 2. Set aspect ratio
+    if (shape === "square" || shape === "circle") {
+      this._cropperInst.setAspectRatio(1)
+    } else {
+      this._cropperInst.setAspectRatio(NaN)
+    }
+
+    // 3. Apply circular overlay — rAF ensures the crop-box DOM has been updated
+    requestAnimationFrame(() => {
+      const { viewBox, face } = this._getCropperEls()
+      const radius = shape === "circle" ? "50%" : "0"
+      if (viewBox) viewBox.style.borderRadius = radius
+      if (face)    face.style.borderRadius    = radius
+      // Also clip the inner image preview inside view-box
+      const vbImg = viewBox?.querySelector("img")
+      if (vbImg) vbImg.style.borderRadius = radius
+    })
   }
 
   _resetCrop() { this._cropperInst?.reset() }
