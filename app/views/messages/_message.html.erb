@@ -342,9 +342,43 @@
               <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
             </video>
           <% elsif message.audio? %>
-            <audio controls class="w-full mb-1">
-              <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
-            </audio>
+            <%# WhatsApp-style audio player with speed control %>
+            <% audio_id = "audio-#{message.id}" %>
+            <div class="flex items-center gap-2 mb-1 w-full"
+                 style="min-width:200px;max-width:320px;"
+                 data-controller="audio-player"
+                 data-audio-player-src-value="<%= rails_blob_path(message.attachment) %>">
+              <audio data-audio-player-target="audio" preload="metadata" style="display:none;">
+                <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
+              </audio>
+              <%# Play/Pause %>
+              <button type="button"
+                      data-audio-player-target="playBtn"
+                      data-action="click->audio-player#togglePlay"
+                      style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;flex-shrink:0;color:<%= mine ? '#fff' : '#111b21' %>;"
+                      title="Reproduzir">
+                <svg data-audio-player-target="playIcon" xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg data-audio-player-target="pauseIcon" xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;display:none;" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+              <%# Waveform + playhead %>
+              <div style="flex:1;position:relative;height:28px;cursor:pointer;min-width:0;"
+                   data-audio-player-target="seekBar"
+                   data-action="click->audio-player#seek">
+                <canvas data-audio-player-target="waveCanvas"
+                        style="position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:3px;"></canvas>
+                <div data-audio-player-target="playhead"
+                     style="position:absolute;top:0;bottom:0;left:0;width:2px;background:<%= mine ? 'rgba(255,255,255,0.9)' : '#00a884' %>;border-radius:1px;pointer-events:none;"></div>
+              </div>
+              <%# Time / duration %>
+              <span data-audio-player-target="timeLabel"
+                    style="font-size:11px;flex-shrink:0;min-width:2.8rem;text-align:right;font-variant-numeric:tabular-nums;color:<%= mine ? 'rgba(255,255,255,0.7)' : '#8696a0' %>;">0:00</span>
+              <%# Speed toggle %>
+              <button type="button"
+                      data-audio-player-target="speedBtn"
+                      data-action="click->audio-player#cycleSpeed"
+                      style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;padding:2px 5px;border-radius:8px;border:1px solid <%= mine ? 'rgba(255,255,255,0.3)' : '#374248' %>;background:none;cursor:pointer;flex-shrink:0;white-space:nowrap;color:<%= mine ? 'rgba(255,255,255,0.8)' : '#8696a0' %>;"
+                      title="Velocidade">1×</button>
+            </div>
           <% else %>
             <a href="<%= rails_blob_path(message.attachment) %>" target="_blank"
                class="flex items-center gap-2 text-[#53bdeb] hover:underline text-sm mb-1">

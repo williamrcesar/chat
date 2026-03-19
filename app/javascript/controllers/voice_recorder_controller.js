@@ -14,23 +14,28 @@ export default class extends Controller {
   static targets = [
     "micBtn",         // green mic button (idle)
     "sendBtn",        // green send-text button (idle, text present)
-    "inputWrap",      // textarea wrapper
-    "bar",            // recording bar (holding / locked)
+    "pillWrap",       // flex-1 wrapper that holds A/B/C pills
+    "inputWrap",      // [A] textarea wrapper
+    "bar",            // [B] recording pill (holding / locked)
     "recDot",         // pulsing red dot
     "timer",          // "0:12" elapsed
     "waveform",       // live waveform canvas
     "cancelHint",     // "← Deslize p/ cancelar"
     "lockBtn",        // 🔒 lock button (holding mode)
     "pauseBtn",       // ⏸/▶ pause/resume (locked mode)
-    "reviewBar",      // review bar (after stop)
+    "reviewBar",      // [C] review pill (after stop)
     "playbackWrap",   // seekable area
     "playbackCanvas", // static waveform canvas
     "playhead",       // position marker
     "durationLabel",  // total duration
     "playBtn",        // ▶/⏸ preview
+    "speedBtn",       // 1× speed toggle
     "cancelBtn",      // 🗑 discard
     "sendVoiceBtn",   // ✈ send
   ]
+
+  // Speed steps for playback: 1× → 1.1× → 1.25× → 1.5× → 1.75× → 2× → 2.5× → 3× → 3.5× → back to 1×
+  static SPEEDS = [1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5]
 
   connect() {
     this._state       = "idle"
@@ -50,6 +55,7 @@ export default class extends Controller {
     this._audioEl     = null   // HTMLAudioElement for review
     this._playAnimId  = null
     this._peakData    = []
+    this._speedIdx    = 0      // index into SPEEDS array
 
     this._boundMove = this._onPointerMove.bind(this)
     this._boundUp   = this._onPointerUp.bind(this)
@@ -153,6 +159,19 @@ export default class extends Controller {
   }
 
   cancelLocked() { this._cancelRecording() }
+
+  cycleSpeed() {
+    if (this._state !== "review") return
+    this._speedIdx = (this._speedIdx + 1) % this.constructor.SPEEDS.length
+    const spd = this.constructor.SPEEDS[this._speedIdx]
+    if (this._audioEl) this._audioEl.playbackRate = spd
+    if (this.hasSpeedBtnTarget) {
+      const label = spd === 1 ? "1×" : spd % 1 === 0 ? `${spd}×` : `${spd}×`
+      this.speedBtnTarget.textContent = label
+      this.speedBtnTarget.style.color = spd === 1 ? "#00a884" : "#fff"
+      this.speedBtnTarget.style.background = spd === 1 ? "none" : "#374248"
+    }
+  }
 
   sendLocked() {
     if (!this._savedBlob) {
@@ -378,19 +397,23 @@ export default class extends Controller {
     // Some browsers fire durationchange, not loadedmetadata
     this._audioEl.addEventListener("durationchange",  setDuration)
 
-    // Show review bar, hide everything else
-    if (this.hasBarTarget)        this.barTarget.style.display        = "none"
-    if (this.hasInputWrapTarget)  this.inputWrapTarget.style.display   = "none"
-    if (this.hasSendBtnTarget)    this.sendBtnTarget.style.display     = "none"
-    if (this.hasMicBtnTarget)     this.micBtnTarget.style.display      = "none"
+    // Show review pill C, hide everything else
+    if (this.hasBarTarget)          this.barTarget.style.display          = "none"
+    if (this.hasInputWrapTarget)    this.inputWrapTarget.style.display    = "none"
+    if (this.hasSendBtnTarget)      this.sendBtnTarget.style.display      = "none"
+    if (this.hasMicBtnTarget)       this.micBtnTarget.style.display       = "none"
 
-    if (this.hasReviewBarTarget) {
-      this.reviewBarTarget.style.display    = "flex"
-      this.reviewBarTarget.style.width      = "100%"
-      this.reviewBarTarget.style.alignItems = "center"
+    // Show pill C — grid-area:1/1 keeps it in bounds
+    if (this.hasReviewBarTarget) this.reviewBarTarget.style.display = "flex"
+    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.style.display = "flex"
+
+    // Reset speed
+    this._speedIdx = 0
+    if (this.hasSpeedBtnTarget) {
+      this.speedBtnTarget.textContent    = "1×"
+      this.speedBtnTarget.style.color    = "#00a884"
+      this.speedBtnTarget.style.background = "none"
     }
-    // Send voice button is outside the pill — show it now
-    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.style.display = ""
 
     this._setPlayBtnIcon("play")
     requestAnimationFrame(() => this._drawReviewWaveform(0))
@@ -455,21 +478,23 @@ export default class extends Controller {
   // ─── UI helpers ─────────────────────────────────────────────────────────
 
   _showHoldingUI() {
-    if (this.hasInputWrapTarget) this.inputWrapTarget.style.display = "none"
-    if (this.hasSendBtnTarget)   this.sendBtnTarget.style.display   = "none"
-    if (this.hasReviewBarTarget) this.reviewBarTarget.style.display  = "none"
+    // Hide pill A + review pill C + action buttons that shouldn't show
+    if (this.hasInputWrapTarget)    this.inputWrapTarget.style.display    = "none"
+    if (this.hasReviewBarTarget)    this.reviewBarTarget.style.display    = "none"
+    if (this.hasSendBtnTarget)      this.sendBtnTarget.style.display      = "none"
+    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.style.display = "none"
 
-    if (this.hasBarTarget) {
-      this.barTarget.style.display    = "flex"
-      this.barTarget.style.width      = "100%"
-      this.barTarget.style.alignItems = "center"
-    }
-    if (this.hasTimerTarget)      this.timerTarget.textContent = "0:00"
-    if (this.hasCancelHintTarget) this.cancelHintTarget.style.opacity = "0"
-    if (this.hasLockBtnTarget)    this.lockBtnTarget.style.display   = "flex"
-    if (this.hasPauseBtnTarget)   this.pauseBtnTarget.style.display  = "none"
+    // Show pill B — grid-area:1/1 keeps it in bounds
+    if (this.hasBarTarget) this.barTarget.style.display = "flex"
+
+    // Init recording UI state
+    if (this.hasTimerTarget)      this.timerTarget.textContent          = "0:00"
+    if (this.hasCancelHintTarget) this.cancelHintTarget.style.opacity   = "0"
+    if (this.hasLockBtnTarget)    this.lockBtnTarget.style.display      = "flex"
+    if (this.hasPauseBtnTarget)   this.pauseBtnTarget.style.display     = "none"
     if (this.hasRecDotTarget)     this.recDotTarget.style.animationPlayState = "running"
 
+    // Mic turns red (stays in place)
     if (this.hasMicBtnTarget) {
       this.micBtnTarget.style.background = "#ef4444"
       this.micBtnTarget.style.transform  = "scale(1.1)"
@@ -489,15 +514,20 @@ export default class extends Controller {
   }
 
   _hideAll() {
+    // Hide pills B and C
     if (this.hasBarTarget)          this.barTarget.style.display          = "none"
-    if (this.hasReviewBarTarget)    this.reviewBarTarget.style.display     = "none"
-    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.style.display  = "none"
-    if (this.hasInputWrapTarget)    this.inputWrapTarget.style.display     = ""
+    if (this.hasReviewBarTarget)    this.reviewBarTarget.style.display    = "none"
+    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.style.display = "none"
+    // Show pill A
+    if (this.hasInputWrapTarget)    this.inputWrapTarget.style.display    = ""
+    // Restore mic
     if (this.hasMicBtnTarget) {
       this.micBtnTarget.style.background = ""
       this.micBtnTarget.style.transform  = ""
       this.micBtnTarget.title = "Segurar para gravar"
     }
+    // Re-sync send/mic based on textarea content
+    this._syncButtons()
   }
 
   _setPauseBtnIcon(mode) {
