@@ -173,7 +173,7 @@ GEM
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
     jmespath (1.6.2)
-    json (2.18.1)
+    json (2.19.3)
     jwt (2.10.2)
       base64
     language_server-protocol (3.17.0.5)
@@ -285,7 +285,7 @@ GEM
     redcarpet (3.6.1)
     redis (5.4.1)
       redis-client (>= 0.22.0)
-    redis-client (0.26.4)
+    redis-client (0.28.0)
       connection_pool
     regexp_parser (2.11.3)
     reline (0.6.3)
@@ -334,7 +334,7 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 4.0)
       websocket (~> 1.0)
-    sidekiq (8.1.1)
+    sidekiq (8.1.2)
       connection_pool (>= 3.0.0)
       json (>= 2.16.0)
       logger (>= 1.7.0)
