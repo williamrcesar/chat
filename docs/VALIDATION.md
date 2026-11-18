@@ -47,3 +47,4 @@ Set `CHROME_BIN` if Chrome is not on PATH. The test configuration supplies fake 
 - GIPHY search needs its own key. Browser microphone permission/codec behavior on real devices, custom notification sound, VAPID push and storage-provider delivery still need provider/device validation.
 - Company, marketing, admin, API and push modules are not exhaustively covered by the current suite. Known campaign resumption/daily-budget and direct-conversation uniqueness work remains in FEATURES_AND_BACKLOG.md.
 - No engine implementation or production deployment is part of this change.
+- CI pins Ubuntu 22.04 for the current Ruby 3.2.3 baseline. The moving `ubuntu-latest` label selected Ubuntu 26.04, where setup-ruby no longer supplies this historical patch release. Revisit that pin alongside the Ruby/Rails upgrade.

@@ -6,8 +6,10 @@ on:
     branches: [ main ]
 
 jobs:
+  # Keep the runner compatible with the current Ruby 3.2.3 baseline.
+  # ubuntu-latest now selects 26.04, which does not provide this patch release.
   scan_ruby:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -26,7 +28,7 @@ jobs:
         run: bin/brakeman --no-pager --no-exit-on-warn
 
   scan_js:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -53,7 +55,7 @@ jobs:
         run: node --test test/javascript/*.mjs
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,7 +73,7 @@ jobs:
         run: bin/rubocop -f github
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     services:
       postgres:
