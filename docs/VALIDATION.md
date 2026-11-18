@@ -24,7 +24,7 @@ Environment: Ubuntu 24.04 under WSL, Ruby 3.2.3, Rails 7.2.3, isolated PostgreSQ
 - RuboCop: **154 Ruby files, no offenses**.
 - Asset compilation: passed, including Tailwind and Sprockets.
 - Importmap audit: **no vulnerable packages found** by that audit.
-- Brakeman: **no scan errors; two lifecycle warnings remain**. The mass-assignment warning was resolved by removing role from generic user updates and restricting global user administration.
+- Brakeman 8.1.0: **no scan errors; two lifecycle warnings remain**. The mass-assignment warning was resolved by removing role from generic user updates and restricting global user administration. The scanner was updated because the project's `--ensure-latest` wrapper rejects the old locked version in CI.
 
 Typical verification commands, after configuring an isolated PostgreSQL test database and test-only secrets:
 
