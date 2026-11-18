@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import Cropper from "cropperjs"
 
 // Manages the sticker/GIF bottom-sheet panel, the file editor modal,
 // and sending stickers via AJAX.
@@ -579,7 +580,6 @@ export default class extends Controller {
     // Cropper needs the image to be visible
     img.style.display = "block"
     this._destroyCropper()
-    if (typeof Cropper === "undefined") return
 
     this._cropperInst = new Cropper(img, {
       viewMode:     2,

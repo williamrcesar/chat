@@ -112,10 +112,10 @@ class MessageBroadcastJob < ApplicationJob
     )
     sound = if participant.notification_sound_file.attached?
               Rails.application.routes.url_helpers.rails_blob_url(participant.notification_sound_file)
-            else
+    else
               NotificationPreferences.sound_path(participant.effective_notification_sound).presence ||
                 NotificationPreferences.sound_path("default")
-            end
+    end
     {
       title:  message.sender.display_name,
       body:   push_body_for(message),
@@ -131,12 +131,12 @@ class MessageBroadcastJob < ApplicationJob
     return "enviou uma figurinha" if message.type_sticker?
     if message.attachment.attached?
       base = case
-             when message.image?    then "sent you an image"
-             when message.audio?    then "sent you an audio"
-             when message.video?    then "sent you a video"
-             when message.document? then "sent you a document"
-             else "sent you a file"
-             end
+      when message.image?    then "sent you an image"
+      when message.audio?    then "sent you an audio"
+      when message.video?    then "sent you a video"
+      when message.document? then "sent you a document"
+      else "sent you a file"
+      end
       base += ": #{message.content.to_s.truncate(80)}" if message.content.present?
       base
     else
