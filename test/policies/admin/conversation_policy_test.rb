@@ -53,12 +53,6 @@ module Admin
       )
     end
 
-    teardown do
-      [ConversationAssignment, Conversation, CompanyAttendant, Company, User].each do |model|
-        model.delete_all
-      end
-    end
-
     test "admin can index" do
       policy = Admin::ConversationPolicy.new(@admin_user, @conversation)
       assert policy.index?

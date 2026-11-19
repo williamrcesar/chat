@@ -67,7 +67,10 @@ class Message < ApplicationRecord
   # Sequência única por conversa (1, 2, 3...) para ordem e referência sempre iguais
   def set_sequence
     return if sequence.present?
-    self.sequence = (conversation.messages.maximum(:sequence) || 0) + 1
+    # The parent lock serializes writers until this insert's transaction commits.
+    conversation.with_lock do
+      self.sequence = (conversation.messages.maximum(:sequence) || 0) + 1
+    end
   end
 
   # Status + data numa só tabela: enviada, recebida, lida, pendente
