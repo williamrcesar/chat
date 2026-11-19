@@ -109,7 +109,7 @@ class MessagesController < ApplicationController
 
     target_conversation = current_user.conversations.find(params[:target_conversation_id])
 
-    @message = target_conversation.messages.create!(
+    @message = target_conversation.messages.build(
       sender:          current_user,
       content:         source.content,
       message_type:    source.message_type,
@@ -119,6 +119,8 @@ class MessagesController < ApplicationController
     if source.attachment.attached?
       @message.attachment.attach(source.attachment.blob)
     end
+    authorize @message, :create?
+    @message.save!
 
     @conversation = target_conversation
     respond_to do |format|
@@ -172,6 +174,7 @@ class MessagesController < ApplicationController
       message_type: :sticker,
       metadata:     {}
     )
+    authorize @message
 
     if params[:sticker_id].present?
       sticker = current_user.stickers.find_by(id: params[:sticker_id])
