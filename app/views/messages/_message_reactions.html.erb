@@ -1,15 +1,23 @@
-<% mine = message.sender_id == current_user.id %>
+<%
+  viewer = local_assigns[:viewer_user].presence || current_user
+  mine = viewer.present? && message.sender_id == viewer.id
+  mine ||= local_assigns[:right_side_sender_ids].is_a?(Array) && local_assigns[:right_side_sender_ids].include?(message.sender_id)
+%>
 <% grouped = message.reactions_grouped %>
 <div id="reactions_<%= message.id %>"
      class="flex flex-wrap gap-1 mt-1 <%= mine ? 'justify-end' : 'justify-start' %>">
   <% grouped.each do |emoji, count| %>
-    <%= button_to conversation_message_reaction_path(message.conversation, message_id: message.id, format: :turbo_stream),
-          params: { emoji: emoji },
-          method: :post,
-          form: { data: { turbo: true } },
-          class: "flex items-center gap-0.5 bg-[#202c33] hover:bg-[#2a3942] border border-[#2a3942] rounded-full px-2 py-0.5 text-xs transition-colors" do %>
-      <span><%= emoji %></span>
-      <span class="text-[#8696a0]"><%= count %></span>
+    <% if current_user.present? %>
+      <%= button_to conversation_message_reaction_path(message.conversation, message_id: message.id, format: :turbo_stream),
+            params: { emoji: emoji },
+            method: :post,
+            form: { data: { turbo: true } },
+            class: "flex items-center gap-0.5 bg-[#202c33] hover:bg-[#2a3942] border border-[#2a3942] rounded-full px-2 py-0.5 text-xs transition-colors" do %>
+        <span><%= emoji %></span>
+        <span class="text-[#8696a0]"><%= count %></span>
+      <% end %>
+    <% else %>
+      <span class="flex items-center gap-0.5 bg-[#202c33] border border-[#2a3942] rounded-full px-2 py-0.5 text-xs"><span><%= emoji %></span><span class="text-[#8696a0]"><%= count %></span></span>
     <% end %>
   <% end %>
 </div>

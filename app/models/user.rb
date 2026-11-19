@@ -18,6 +18,7 @@ class User < ApplicationRecord
 
   has_many :marketing_templates, dependent: :destroy
   has_many :marketing_campaigns,  dependent: :destroy
+  has_many :stickers,             dependent: :destroy
 
   has_many :web_push_subscriptions, dependent: :destroy
 

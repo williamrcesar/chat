@@ -25,6 +25,8 @@ Rails.application.routes.draw do
       collection do
         post :from_template
         post :forward
+        post :send_sticker
+        post :send_voice
         get  :search
       end
       member do
@@ -41,6 +43,8 @@ Rails.application.routes.draw do
 
   resource  :profile, only: %i[ show edit update ]
   resources :templates
+
+  resources :stickers, only: %i[ index create update destroy ]
 
   post "calls", to: "calls#create"
 
@@ -108,7 +112,12 @@ Rails.application.routes.draw do
     resources :users, only: %i[ index show edit update destroy ] do
       member { patch :toggle_admin }
     end
-    resources :conversations, only: %i[ index show destroy ]
+    resources :conversations, only: %i[ index show destroy ] do
+      member do
+        patch :mode
+        post  :send_message
+      end
+    end
   end
 
   # API v1 (JWT auth — for future mobile apps)

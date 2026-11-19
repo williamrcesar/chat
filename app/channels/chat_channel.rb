@@ -10,13 +10,19 @@ class ChatChannel < ApplicationCable::Channel
       broadcast_interactive_lock_state
       mark_sent_messages_delivered_for_subscriber!
     else
-      reject
+      @conversation = Conversation.find_by(id: params[:conversation_id])
+      if @conversation && admin_can_view_conversation?
+        # Admin or supervisor viewing a conversation they are not a participant in (read-only + new_message updates)
+        stream_from "admin_conversation_#{@conversation.id}"
+      else
+        reject
+      end
     end
   end
 
   def unsubscribed
-    current_user.touch_offline!
-    broadcast_presence(false) if @conversation
+    current_user.touch_offline! if @conversation && current_user.conversations.exists?(@conversation.id)
+    broadcast_presence(false) if @conversation && current_user.conversations.exists?(@conversation.id)
     stop_all_streams
   end
 
@@ -62,6 +68,15 @@ class ChatChannel < ApplicationCable::Channel
   end
 
   private
+
+  def admin_can_view_conversation?
+    return false unless @conversation
+    return true if current_user.role_admin?
+    return false unless current_user.company_attendants.supervisors.exists?
+    return false unless @conversation.conversation_assignment.present?
+    company_ids = current_user.company_attendants.supervisors.pluck(:company_id)
+    @conversation.conversation_assignment.company_id.in?(company_ids)
+  end
 
   def broadcast_interactive_lock_state
     return unless @conversation

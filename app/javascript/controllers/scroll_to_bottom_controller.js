@@ -4,25 +4,39 @@ import { Controller } from "@hotwired/stimulus"
 // Garante que as últimas mensagens apareçam ao clicar na conversa.
 export default class extends Controller {
   connect() {
+    // Scroll imediato + após renderização do layout (imagens, stickers, etc.)
     this.scroll()
     this.scheduleScrollAfterLayout()
+
+    // Garantir scroll também quando Turbo termina qualquer navegação
+    this._onTurboLoad = () => this.scroll()
+    document.addEventListener("turbo:load",        this._onTurboLoad)
+    document.addEventListener("turbo:render",      this._onTurboLoad)
+    document.addEventListener("turbo:frame-load",  this._onTurboLoad)
   }
 
-  // Chamado por data-action="turbo:load->scroll-to-bottom#scroll" quando o Turbo termina de renderizar
+  disconnect() {
+    document.removeEventListener("turbo:load",       this._onTurboLoad)
+    document.removeEventListener("turbo:render",     this._onTurboLoad)
+    document.removeEventListener("turbo:frame-load", this._onTurboLoad)
+  }
+
+  // Chamado por data-action="turbo:load->scroll-to-bottom#scroll"
   scroll() {
     const container = this.element
     if (!container) return
     container.scrollTop = container.scrollHeight
     const anchor = document.getElementById("messages-bottom")
-    if (anchor) anchor.scrollIntoView({ behavior: "auto", block: "end" })
+    if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "end" })
   }
 
-  // Repete após layout (imagens, fontes) para corrigir scroll
+  // Repete após layout (imagens, fontes, stickers) para corrigir scroll
   scheduleScrollAfterLayout() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => this.scroll())
     })
-    setTimeout(() => this.scroll(), 100)
-    setTimeout(() => this.scroll(), 350)
+    setTimeout(() => this.scroll(), 150)
+    setTimeout(() => this.scroll(), 500)
+    setTimeout(() => this.scroll(), 1000)
   }
 }

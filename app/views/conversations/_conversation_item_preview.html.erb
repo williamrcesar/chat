@@ -1,19 +1,44 @@
 <div class="flex items-center justify-between mt-0.5" id="conversation-preview-<%= conversation.id %>">
-<% last = conversation.last_message %>
-<% unread = conversation.unread_count_for(current_user) %>
-<% last_react = conversation.last_activity_reaction_for_preview %>
-<span class="text-[#8696a0] text-xs truncate">
-  <% if last_react %>
-    <%= last_react[:user_name] %> curtiu <%= last_react[:emoji] %>
-  <% elsif last %>
+<% last         = conversation.last_message %>
+<% unread       = conversation.unread_count_for(current_user) %>
+<% emoji_preview = last&.content.present? && emoji_only_text?(last.content) %>
+<span class="text-[#8696a0] min-w-0 flex-1 flex items-center overflow-hidden" style="max-height: 2rem;">
+  <% if last %>
+    <%# Checkmark when current user sent the last message %>
     <% if last.sender == current_user %>
-      <svg xmlns="http://www.w3.org/2000/svg" class="inline h-3 w-3 text-[#53bdeb] mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" class="inline h-3 w-3 text-[#53bdeb] mr-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
       </svg>
     <% end %>
-    <%= last.type_image? ? "📷 Foto" : last.type_audio? ? "🎤 Áudio" : last.type_video? ? "🎥 Vídeo" : last.type_document? ? "📄 Documento" : last.content&.truncate(40) %>
+    <% if last.deleted_for_everyone? %>
+      <span class="italic text-xs truncate">Mensagem apagada</span>
+    <% elsif last.type_sticker? %>
+      <span class="text-xs truncate">🎭 Figurinha</span>
+    <% elsif last.type_image? || (last.attachment.attached? && last.image?) %>
+      <span class="text-xs truncate">📷 Foto</span>
+    <% elsif last.type_audio? || (last.attachment.attached? && last.audio?) %>
+      <span class="text-xs truncate">🎤 Áudio</span>
+    <% elsif last.type_video? || (last.attachment.attached? && last.video?) %>
+      <span class="text-xs truncate">🎥 Vídeo</span>
+    <% elsif last.type_document? || (last.attachment.attached? && last.document?) %>
+      <span class="text-xs truncate">📄 Documento</span>
+    <% elsif last.attachment.attached? %>
+      <span class="text-xs truncate">📎 Arquivo</span>
+    <% elsif emoji_preview %>
+      <% c = emoji_grapheme_count(last.content) %>
+      <span class="leading-none flex-shrink-0" style="font-size: <%= c <= 1 ? '1.35rem' : c <= 2 ? '1.1rem' : '0.9rem' %>; line-height: 1;"><%= h(last.content.to_s.strip) %></span>
+    <% elsif last.content.present? %>
+      <% content_text = last.content.to_s.strip %>
+      <% if content_text =~ /\A(https?:\/\/[^\s]+)\z/ %>
+        <span class="text-xs truncate">🔗 <%= URI.parse($1).host rescue content_text.truncate(35) %></span>
+      <% else %>
+        <span class="text-xs truncate"><%= content_text.truncate(40) %></span>
+      <% end %>
+    <% else %>
+      <span class="italic text-xs truncate">Mensagem</span>
+    <% end %>
   <% else %>
-    Nenhuma mensagem
+    <span class="text-xs">Nenhuma mensagem</span>
   <% end %>
 </span>
 <% if unread > 0 %>

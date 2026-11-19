@@ -27,6 +27,9 @@ export default class extends Controller {
       if (el) fragment.appendChild(el)
     }
     content.appendChild(fragment)
+
+    // Notify voice-recorder (sibling controller) that a file was attached
+    document.dispatchEvent(new CustomEvent("file-preview:attached", { bubbles: false }))
   }
 
   buildPreviewNode(file) {
@@ -62,6 +65,9 @@ export default class extends Controller {
     const content = document.getElementById("file-preview-content")
     if (preview) preview.classList.add("hidden")
     if (content) content.innerHTML = ""
+
+    // Notify voice-recorder that file was cleared
+    document.dispatchEvent(new CustomEvent("file-preview:cleared", { bubbles: false }))
   }
 
   formatSize(bytes) {

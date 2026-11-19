@@ -117,6 +117,8 @@ export default class extends Controller {
     if (this.hasInputTarget) {
       this.inputTarget.value = ""
       this.inputTarget.style.height = "auto"
+      // Notify voice-recorder to switch back to mic button
+      this.inputTarget.dispatchEvent(new Event("input", { bubbles: true }))
     }
     if (this.hasSubmitButtonTarget) {
       this.submitButtonTarget.disabled = false
@@ -126,6 +128,11 @@ export default class extends Controller {
     }
     document.getElementById("file-preview")?.classList.add("hidden")
     document.getElementById("file-preview-content") && (document.getElementById("file-preview-content").innerHTML = "")
+    // Clear reply context
+    const replyField  = document.getElementById("reply-to-id-field")
+    const replyBanner = document.getElementById("reply-banner")
+    if (replyField)  replyField.value        = ""
+    if (replyBanner) replyBanner.style.display = "none"
   }
 
   autoResize(event) {
