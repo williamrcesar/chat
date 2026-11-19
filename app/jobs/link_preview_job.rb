@@ -1,11 +1,10 @@
 # Busca og:image e og:title da primeira URL no conteúdo da mensagem e guarda em metadata para mostrar preview.
-require "open-uri"
 
 class LinkPreviewJob < ApplicationJob
   queue_as :default
 
   # Regex para a primeira URL http(s) no texto
-  URL_REGEX = %r{\bhttps?://[^\s<>"']+(?:[^\s<>"')\].,;:!?]*)?}
+  URL_REGEX = %r{\bhttps?://[^\s<>"']+}
 
   def perform(message_id)
     message = Message.find_by(id: message_id)
@@ -47,14 +46,7 @@ class LinkPreviewJob < ApplicationJob
   end
 
   def fetch_html(url)
-    URI.open(
-      url,
-      open_timeout: 5,
-      read_timeout: 5,
-      "User-Agent" => "Mozilla/5.0 (compatible; LinkPreview/1.0)"
-    ).read.force_encoding("UTF-8")
-  rescue URI::InvalidURIError, SocketError, Timeout::Error, Errno::ECONNREFUSED, OpenURI::HTTPError => _e
-    nil
+    LinkPreviewFetcher.new.fetch(url)
   end
 
   def absolute_url(href, base_url)
