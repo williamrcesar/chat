@@ -29,6 +29,7 @@ class HmsService
   end
 
   def self.generate_auth_token(room_id:, user_id:, role: "host")
+    validate_credentials!
     now = Time.now.to_i
     exp = now + 24 * 3600
     payload = {
@@ -47,6 +48,7 @@ class HmsService
   end
 
   def self.generate_management_token
+    validate_credentials!
     now = Time.now.to_i
     exp = now + 86400
     payload = {
@@ -60,4 +62,10 @@ class HmsService
     }
     JWT.encode(payload, ENV["HMS_APP_SECRET"], "HS256")
   end
+
+  def self.validate_credentials!
+    missing = %w[HMS_APP_ACCESS_KEY HMS_APP_SECRET].select { |key| ENV[key].blank? }
+    raise Error, "Missing 100ms configuration: #{missing.join(', ')}" if missing.any?
+  end
+  private_class_method :validate_credentials!
 end

@@ -1,5 +1,6 @@
 module Admin
   class UsersController < BaseController
+    before_action :require_admin!
     before_action :set_user, only: %i[ show edit update destroy toggle_admin ]
 
     def index
@@ -50,12 +51,16 @@ module Admin
 
     private
 
+    def require_admin!
+      head :forbidden unless current_user&.role_admin?
+    end
+
     def set_user
       @user = User.find(params[:id])
     end
 
     def user_params
-      params.require(:user).permit(:display_name, :email, :phone, :bio, :role)
+      params.require(:user).permit(:display_name, :email, :phone, :bio)
     end
   end
 end
