@@ -12,7 +12,7 @@ class CreateCompanyAttendants < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :company_attendants, %i[company_id user_id], unique: true
+    add_index :company_attendants, %i[ company_id user_id ], unique: true
     add_index :company_attendants, :status
   end
 end

@@ -11,7 +11,8 @@ Rails.application.routes.draw do
 
   root to: redirect("/users/sign_in")
 
-  resources :conversations, only: %i[index show create] do
+  resources :conversations, only: %i[ index show create ] do
+    resource :notification_settings, only: %i[ show update ], controller: "conversations/notification_settings"
     member do
       post   :add_participant
       delete "participants/:user_id", action: :remove_participant, as: :remove_participant
@@ -20,10 +21,12 @@ Rails.application.routes.draw do
       patch  :toggle_pin
     end
 
-    resources :messages, only: [:index, :create] do
+    resources :messages, only: [ :index, :create ] do
       collection do
         post :from_template
         post :forward
+        post :send_sticker
+        post :send_voice
         get  :search
       end
       member do
@@ -38,11 +41,15 @@ Rails.application.routes.draw do
     end
   end
 
-  resource  :profile, only: %i[show edit update]
+  resource  :profile, only: %i[ show edit update ]
   resources :templates
 
+  resources :stickers, only: %i[ index create update destroy ]
+
+  post "calls", to: "calls#create"
+
   # Contact requests (nickname-based friendship system)
-  resources :contact_requests, only: %i[index create] do
+  resources :contact_requests, only: %i[ index create ] do
     member do
       patch :accept
       patch :block
@@ -54,7 +61,7 @@ Rails.application.routes.draw do
     resources :templates do
       member { get :preview }
     end
-    resources :campaigns, only: %i[index show new create] do
+    resources :campaigns, only: %i[ index show new create edit update ] do
       member do
         post :launch
         post :pause
@@ -69,18 +76,18 @@ Rails.application.routes.draw do
   end
 
   # Company accounts — creation and public profile
-  resources :companies, only: %i[new create show]
+  resources :companies, only: %i[ new create show ]
 
-  # Company namespace — dashboard, attendants, settings, assignments
-  namespace :company do
-    get  "dashboard",  to: "dashboard#index",  as: :dashboard
-    resource  :settings, only: %i[show edit update]
+  # Company portal (module CompanyPortal to avoid conflict with Company model)
+  scope path: "company", as: "company", module: "company_portal" do
+    get "dashboard", to: "dashboard#index", as: :dashboard
+    resource  :settings, only: %i[ show edit update ]
 
     resources :attendants do
       member { patch :toggle_status }
     end
 
-    resources :assignments, only: %i[index show] do
+    resources :assignments, only: %i[ index show ] do
       member do
         patch :transfer
         patch :resolve
@@ -88,21 +95,29 @@ Rails.application.routes.draw do
     end
 
     # Customer-facing: when they click a department from the menu
-    resources :menu_clicks, only: %i[create]
+    resources :menu_clicks, only: %i[ create ]
   end
 
   # Web Push Notifications (PWA)
-  resources :web_push_subscriptions, only: %i[create destroy] do
+  resources :web_push_subscriptions, only: %i[ create destroy ] do
     collection { get :vapid_public_key }
   end
+
+  # Signed URL for push notification icon (avatar, color, or custom image)
+  get "notification_icons/show", to: "notification_icons#show", as: :notification_icon
 
   # Admin dashboard
   namespace :admin do
     root to: "dashboard#index"
-    resources :users, only: %i[index show edit update destroy] do
+    resources :users, only: %i[ index show edit update destroy ] do
       member { patch :toggle_admin }
     end
-    resources :conversations, only: %i[index show destroy]
+    resources :conversations, only: %i[ index show destroy ] do
+      member do
+        patch :mode
+        post  :send_message
+      end
+    end
   end
 
   # API v1 (JWT auth — for future mobile apps)
@@ -114,13 +129,13 @@ Rails.application.routes.draw do
         post   "auth/sign_up",  to: "auth/registrations#create"
       end
 
-      resource  :profile, only: %i[show update], controller: "profile"
+      resource  :profile, only: %i[ show update ], controller: "profile"
       resources :templates
-      resources :conversations, only: %i[index show create] do
+      resources :conversations, only: %i[ index show create ] do
         member do
           get :participants
         end
-        resources :messages, only: %i[index create destroy]
+        resources :messages, only: %i[ index create destroy ]
       end
     end
   end

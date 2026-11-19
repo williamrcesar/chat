@@ -1,60 +1,364 @@
-<% mine = message.sender_id == current_user.id %>
+<%
+  viewer = local_assigns[:viewer_user].presence || current_user
+  mine = viewer.present? && message.sender_id == viewer.id
+  mine ||= local_assigns[:right_side_sender_ids].is_a?(Array) && local_assigns[:right_side_sender_ids].include?(message.sender_id)
+
+  # Determine render mode early so wrapper width can adjust
+  render_mode =
+    if message.type_sticker? && message.attachment.attached?
+      :sticker
+    elsif message.content.present? && !message.attachment.attached? && !message.deleted_for_everyone? && emoji_only_text?(message.content)
+      :emoji_only
+    else
+      :bubble
+    end
+%>
+<% client_msg_id = message.metadata.is_a?(Hash) && message.metadata["client_message_id"] %>
 
 <div id="<%= dom_id(message) %>"
-     class="flex <%= mine ? 'justify-end' : 'justify-start' %> mb-1 group/msg px-2">
+     class="flex <%= mine ? 'justify-end' : 'justify-start' %> group/msg relative px-2 min-w-0 <%= local_assigns[:first_in_list] ? '' : (local_assigns[:same_sender_as_previous] ? 'mt-0.5' : 'mt-1') %>"
+     <% if client_msg_id.present? %>data-client-message-id="<%= client_msg_id %>"<% end %>>
 
-  <div class="max-w-[65%] relative">
+  <%# Bubble: fixed max-width; emoji/sticker: shrink-wrap so justify-end/start works correctly %>
+  <% interactive_user = local_assigns[:viewer_user].presence || current_user %>
+  <%
+    msg_text        = message.deleted_for_everyone? ? "" : message.content.to_s
+    msg_sender_name = message.sender.display_name
+    msg_preview     = message.deleted_for_everyone? ? "Mensagem apagada" : message.content.to_s.truncate(80)
+    msg_is_sticker  = message.type_sticker?
+    msg_has_attach  = message.attachment.attached?
+    msg_attach_url  = msg_has_attach ? rails_blob_path(message.attachment) : ""
+    msg_thumb       = msg_has_attach && (message.image? || msg_is_sticker) ? rails_blob_path(message.attachment) : ""
+  %>
+  <% if render_mode == :bubble %>
+    <% wrapper_cls = "max-w-[min(65%,22rem)] w-full min-w-0" %>
+  <% else %>
+    <% wrapper_cls = "max-w-[min(80%,28rem)] w-auto" %>
+  <% end %>
 
-    <%# Context menu (hover actions) %>
-    <div class="absolute <%= mine ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2' %> top-0 hidden group-hover/msg:flex items-center gap-1 z-10">
-
-      <%# Emoji reaction picker %>
-      <div class="relative" data-controller="emoji-picker">
+  <%# Stickers: wrap in w-fit so context-menu-bar positions relative to sticker, not full-width row %>
+  <% if render_mode == :sticker %>
+    <div class="relative w-fit max-w-full <%= mine ? 'ml-auto' : 'mr-auto' %>">
+    <%# Context menu for sticker — positions relative to the w-fit wrapper above %>
+    <% if interactive_user.present? %>
+    <div class="context-menu-bar absolute <%= mine ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1' %> top-1 hidden group-hover/msg:flex items-center gap-0.5 z-10"
+         data-controller="msg-options emoji-picker"
+         data-msg-text=""
+         data-msg-attachment-url="<%= msg_attach_url %>">
+      <%# Reação rápida %>
+      <div class="relative">
         <button data-action="click->emoji-picker#toggle"
-                class="p-1 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-xs text-[#8696a0] hover:text-white transition-colors"
+                class="p-1.5 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-base text-[#8696a0] hover:text-white transition-colors leading-none"
                 title="Reagir">😊</button>
         <div data-emoji-picker-target="panel"
-             class="hidden absolute bottom-8 <%= mine ? 'right-0' : 'left-0' %> bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex gap-1 z-20">
-          <% MessageReaction::ALLOWED_EMOJIS.each do |emoji| %>
-            <%= button_to message_reaction_path(@conversation || message.conversation, message_id: message.id),
-                  params: { emoji: emoji },
-                  method: :post,
-                  form: { data: { turbo: false } },
+             class="hidden absolute bottom-9 <%= mine ? 'right-0' : 'left-0' %> bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex items-center gap-1 z-20 max-w-[min(90vw,22rem)]">
+          <% (MessageReaction::EMOJI_CATEGORIES["Recentes / Favoritos"] || MessageReaction::ALLOWED_EMOJIS.first(8)).each do |emoji| %>
+            <%= button_to conversation_message_reaction_path(@conversation || message.conversation, message_id: message.id, format: :turbo_stream),
+                  params: { emoji: emoji }, method: :post, form: { data: { turbo: true } },
                   class: "text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-[#2a3942]" do %>
               <%= emoji %>
             <% end %>
           <% end %>
+          <button type="button" data-action="click->emoji-picker#openMore"
+                  class="ml-1 px-2 py-1 rounded-lg border border-[#2a3942] text-xs text-[#8696a0] hover:text-white hover:bg-[#2a3942] transition-colors">Mais</button>
+        </div>
+      </div>
+      <%# Opções ⋮ %>
+      <div class="relative">
+        <button type="button"
+                data-action="click->msg-options#toggle"
+                class="p-1.5 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-[#8696a0] hover:text-white transition-colors"
+                title="Opções">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"/>
+          </svg>
+        </button>
+        <div data-msg-options-target="menu"
+             style="display:none;"
+             class="absolute <%= mine ? 'right-0' : 'left-0' %> top-full mt-1 w-52 bg-[#233138] border border-[#2a3942] rounded-2xl shadow-2xl overflow-hidden z-30 py-1">
+          <button type="button"
+                  data-controller="reply"
+                  data-action="click->reply#set click->msg-options#_hide"
+                  data-reply-id-value="<%= message.id %>"
+                  data-reply-sender-value="<%= h(msg_sender_name) %>"
+                  data-reply-preview-value="<%= h(msg_preview) %>"
+                  data-reply-is-sticker-value="true"
+                  data-reply-thumb-value="<%= msg_thumb %>"
+                  class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+            </svg>
+            Responder
+          </button>
+          <a href="<%= rails_blob_path(message.attachment, disposition: :attachment) %>"
+             download
+             data-action="click->msg-options#_hide"
+             class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Baixar figurinha
+          </a>
+          <button type="button"
+                  data-controller="sticker-save"
+                  data-sticker-save-url-value="<%= rails_blob_path(message.attachment) %>"
+                  data-action="click->sticker-save#save click->msg-options#_hide"
+                  class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            Adicionar aos favoritos
+          </button>
+          <% if mine %>
+            <div class="border-t border-[#2a3942] my-1"></div>
+            <%= button_to delete_for_everyone_conversation_message_path(message.conversation, message),
+                  method: :delete,
+                  data: { turbo_confirm: "Apagar esta mensagem para todos?" },
+                  form: { class: "w-full" },
+                  class: "flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-[#2a3942] transition-colors" do %>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+              Apagar para todos
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+      <%# Reaction modal (teleported to body by JS) %>
+      <div data-emoji-picker-target="modal"
+           class="hidden fixed inset-0 z-[500] flex flex-col justify-end"
+           aria-modal="true" role="dialog">
+        <div class="reaction-modal-overlay absolute inset-0 bg-black/70 backdrop-blur-[2px]"></div>
+        <div class="relative w-full bg-[#1d2b32] border-t border-[#2a3942] shadow-2xl rounded-t-2xl flex flex-col" style="max-height: 70vh;">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-[#2a3942] flex-shrink-0">
+            <p class="text-white text-sm font-semibold">Reagir</p>
+            <button type="button" class="reaction-modal-close text-[#8696a0] hover:text-white text-lg leading-none">✕</button>
+          </div>
+          <div class="overflow-y-auto px-3 py-3 space-y-4">
+            <% MessageReaction::EMOJI_CATEGORIES.each do |category, emojis| %>
+              <% next if category == "Recentes / Favoritos" %>
+              <div>
+                <p class="text-[#8696a0] text-xs font-semibold uppercase tracking-widest mb-2"><%= category %></p>
+                <div class="flex flex-wrap gap-0.5">
+                  <% emojis.each do |emoji| %>
+                    <%= button_to conversation_message_reaction_path(@conversation || message.conversation, message_id: message.id, format: :turbo_stream),
+                          params: { emoji: emoji }, method: :post, form: { data: { turbo: true } },
+                          class: "text-2xl leading-none p-2 rounded-xl hover:bg-[#2a3942] hover:scale-125 transition-all active:scale-95" do %>
+                      <%= emoji %>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+    <% end %><%# end interactive_user for sticker %>
+    <%# Sticker image %>
+    <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> py-1">
+      <img src="<%= rails_blob_path(message.attachment) %>"
+           alt="Figurinha"
+           class="max-w-[min(65%,22rem)] h-auto object-contain select-none block"
+           loading="lazy" />
+    </div>
+    <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> items-center gap-1 mt-0.5 px-1">
+      <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
+      <%= render "messages/status_tick", message: message, mine: mine %>
+    </div>
+    <%# Reactions bar for sticker %>
+    <%= render "messages/message_reactions", message: message, current_user: current_user %>
+    </div><%# end w-fit wrapper %>
+  <% else %><%# ── non-sticker: normal wrapper ── %>
+
+  <div class="<%= wrapper_cls %> relative flex flex-col" data-controller="emoji-picker">
+
+    <%# Context menu — shown on hover -%>
+    <% if interactive_user.present? %>
+    <div class="context-menu-bar absolute <%= mine ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1' %> top-0 hidden group-hover/msg:flex items-center gap-0.5 z-10"
+         data-controller="msg-options"
+         data-msg-text="<%= h(msg_text) %>"
+         data-msg-attachment-url="<%= msg_attach_url %>">
+
+      <%# Quick emoji reaction %>
+      <div class="relative">
+        <button data-action="click->emoji-picker#toggle"
+                class="p-1.5 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-base text-[#8696a0] hover:text-white transition-colors leading-none"
+                title="Reagir">😊</button>
+        <div data-emoji-picker-target="panel"
+             class="hidden absolute bottom-9 <%= mine ? 'right-0' : 'left-0' %> bg-[#233138] border border-[#2a3942] rounded-2xl shadow-xl p-2 flex items-center gap-1 z-20 max-w-[min(90vw,22rem)]">
+          <% (MessageReaction::EMOJI_CATEGORIES["Recentes / Favoritos"] || MessageReaction::ALLOWED_EMOJIS.first(8)).each do |emoji| %>
+            <%= button_to conversation_message_reaction_path(@conversation || message.conversation, message_id: message.id, format: :turbo_stream),
+                  params: { emoji: emoji }, method: :post, form: { data: { turbo: true } },
+                  class: "text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-[#2a3942]" do %>
+              <%= emoji %>
+            <% end %>
+          <% end %>
+          <button type="button" data-action="click->emoji-picker#openMore"
+                  class="ml-1 px-2 py-1 rounded-lg border border-[#2a3942] text-xs text-[#8696a0] hover:text-white hover:bg-[#2a3942] transition-colors">
+            Mais
+          </button>
         </div>
       </div>
 
-      <%# Forward button %>
-      <button data-controller="forward-modal"
-              data-action="click->forward-modal#open"
-              data-forward-modal-message-id-value="<%= message.id %>"
-              data-forward-modal-conversation-id-value="<%= message.conversation_id %>"
-              class="p-1 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-[#8696a0] hover:text-white transition-colors"
-              title="Encaminhar">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </button>
-
-      <%# Delete for everyone (own messages only) %>
-      <% if mine && !message.deleted_for_everyone? %>
-        <%= button_to delete_for_everyone_conversation_message_path(message.conversation, message),
-              method: :delete,
-              data: { turbo_confirm: "Apagar esta mensagem para todos?" },
-              class: "p-1 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-[#8696a0] hover:text-red-400 transition-colors",
-              title: "Apagar para todos" do %>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      <%# ⋮ Options dropdown %>
+      <div class="relative">
+        <button type="button"
+                data-action="click->msg-options#toggle"
+                class="p-1.5 bg-[#202c33] hover:bg-[#2a3942] rounded-full text-[#8696a0] hover:text-white transition-colors"
+                title="Opções">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"/>
           </svg>
-        <% end %>
-      <% end %>
+        </button>
+
+        <%# Dropdown menu %>
+        <div data-msg-options-target="menu"
+             style="display:none;"
+             class="absolute <%= mine ? 'right-0' : 'left-0' %> top-full mt-1 w-52 bg-[#233138] border border-[#2a3942] rounded-2xl shadow-2xl overflow-hidden z-30 py-1">
+
+          <%# Responder %>
+          <% unless message.deleted_for_everyone? %>
+            <button type="button"
+                    data-controller="reply"
+                    data-action="click->reply#set click->msg-options#_hide"
+                    data-reply-id-value="<%= message.id %>"
+                    data-reply-sender-value="<%= h(msg_sender_name) %>"
+                    data-reply-preview-value="<%= h(msg_preview) %>"
+                    data-reply-is-sticker-value="<%= msg_is_sticker %>"
+                    data-reply-thumb-value="<%= msg_thumb %>"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+              </svg>
+              Responder
+            </button>
+          <% end %>
+
+          <%# Encaminhar %>
+          <button type="button"
+                  data-controller="forward-modal"
+                  data-action="click->forward-modal#open click->msg-options#_hide"
+                  data-forward-modal-message-id-value="<%= message.id %>"
+                  data-forward-modal-conversation-id-value="<%= message.conversation_id %>"
+                  class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Encaminhar
+          </button>
+
+          <%# Copiar texto (só se tiver conteúdo) %>
+          <% if msg_text.present? %>
+            <button type="button"
+                    data-action="click->msg-options#copy"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              Copiar
+            </button>
+          <% end %>
+
+          <%# Baixar arquivo (se tiver anexo) %>
+          <% if msg_has_attach %>
+            <button type="button"
+                    data-action="click->msg-options#download"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Baixar
+            </button>
+          <% end %>
+
+          <%# Salvar figurinha (sticker de outro usuário) %>
+          <% if msg_is_sticker && !mine %>
+            <button type="button"
+                    data-action="click->msg-options#saveSticker"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#8696a0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+              </svg>
+              Salvar figurinha
+            </button>
+          <% end %>
+
+          <%# Separador %>
+          <% if mine && !message.deleted_for_everyone? %>
+            <div class="border-t border-[#2a3942] my-1"></div>
+            <%# Apagar para todos %>
+            <%= button_to delete_for_everyone_conversation_message_path(message.conversation, message),
+                  method: :delete,
+                  data: { turbo_confirm: "Apagar esta mensagem para todos?" },
+                  form: { class: "w-full" },
+                  class: "flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-[#2a3942] transition-colors" do %>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+              Apagar para todos
+            <% end %>
+          <% end %>
+
+        </div>
+      </div>
+
+    </div>
+    <% end %>
+
+    <%# Reaction modal — teleported to <body> on open via JS so position:fixed works without ancestor transform interference %>
+    <div data-emoji-picker-target="modal"
+         class="hidden fixed inset-0 z-[500] flex flex-col justify-end"
+         aria-modal="true" role="dialog">
+      <%# Dark overlay — blocks messages behind %>
+      <div class="reaction-modal-overlay absolute inset-0 bg-black/70 backdrop-blur-[2px]"></div>
+
+      <%# Bottom sheet %>
+      <div class="relative w-full bg-[#1d2b32] border-t border-[#2a3942] shadow-2xl rounded-t-2xl flex flex-col"
+           style="max-height: 70vh;">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-[#2a3942] flex-shrink-0">
+          <p class="text-white text-sm font-semibold">Reagir</p>
+          <button type="button" class="reaction-modal-close text-[#8696a0] hover:text-white text-lg leading-none">✕</button>
+        </div>
+        <div class="overflow-y-auto px-3 py-3 space-y-4">
+          <% MessageReaction::EMOJI_CATEGORIES.each do |category, emojis| %>
+            <% next if category == "Recentes / Favoritos" %>
+            <div>
+              <p class="text-[#8696a0] text-xs font-semibold uppercase tracking-widest mb-2"><%= category %></p>
+              <div class="flex flex-wrap gap-0.5">
+                <% emojis.each do |emoji| %>
+                  <%= button_to conversation_message_reaction_path(@conversation || message.conversation, message_id: message.id, format: :turbo_stream),
+                        params: { emoji: emoji },
+                        method: :post,
+                        form: { data: { turbo: true } },
+                        class: "text-2xl leading-none p-2 rounded-xl hover:bg-[#2a3942] hover:scale-125 transition-all active:scale-95" do %>
+                    <%= emoji %>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
     </div>
 
-    <%# Message bubble %>
-    <div class="<%= mine ? 'bg-[#005c4b]' : 'bg-[#202c33]' %> rounded-lg px-3 py-2 shadow-sm">
+    <%# ── EMOJI-ONLY (no bubble, large glyph) ─────────────────────────── %>
+    <% if render_mode == :emoji_only %>
+      <% ec = emoji_grapheme_count(message.content) %>
+      <% emoji_px = ec <= 1 ? "5rem" : ec == 2 ? "4rem" : "3rem" %>
+      <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> py-1">
+        <span class="leading-none select-none" style="font-size: <%= emoji_px %>; line-height: 1;"><%= h(message.content.to_s.strip) %></span>
+      </div>
+      <%# Timestamp below emoji %>
+      <div class="flex <%= mine ? 'justify-end' : 'justify-start' %> items-center gap-1 mt-0.5 px-1">
+        <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
+        <%= render "messages/status_tick", message: message, mine: mine %>
+      </div>
+    <% end %>
+
+    <%# ── NORMAL BUBBLE ────────────────────────────────────────────────── %>
+    <% if render_mode == :bubble %>
+    <div class="<%= mine ? 'bg-[#005c4b]' : 'bg-[#202c33]' %> rounded-lg px-3 py-2 shadow-sm min-w-0 overflow-hidden">
 
       <%# Sender name (group chats) %>
       <% if !mine %>
@@ -71,11 +375,31 @@
         </div>
       <% end %>
 
-      <%# Reply preview %>
+      <%# Reply preview — quoted message block %>
       <% if message.reply_to %>
-        <div class="border-l-2 border-[#00a884] pl-2 mb-2 bg-black/10 rounded pr-2 py-1">
-          <p class="text-[#00a884] text-xs font-semibold"><%= message.reply_to.sender.display_name %></p>
-          <p class="text-[#8696a0] text-xs truncate"><%= message.reply_to.content&.truncate(60) %></p>
+        <% rt = message.reply_to %>
+        <div class="flex items-stretch gap-2 mb-2 rounded-lg overflow-hidden bg-black/20 border-l-4 border-[#00a884] cursor-pointer hover:bg-black/30 transition-colors"
+             onclick="document.getElementById('<%= dom_id(rt) %>')?.scrollIntoView({behavior:'smooth', block:'center'})">
+          <%# Thumbnail if image/sticker %>
+          <% if rt.attachment.attached? && (rt.image? || rt.type_sticker?) %>
+            <img src="<%= rails_blob_path(rt.attachment) %>"
+                 class="w-12 h-12 object-cover flex-shrink-0" alt="" />
+          <% end %>
+          <div class="flex-1 min-w-0 py-1 pr-2 <%= rt.attachment.attached? && (rt.image? || rt.type_sticker?) ? '' : 'pl-2' %>">
+            <p class="text-[#00a884] text-xs font-semibold truncate"><%= rt.sender.display_name %></p>
+            <p class="text-[#8696a0] text-xs truncate leading-snug">
+              <% if rt.deleted_for_everyone? %>
+                <em>Mensagem apagada</em>
+              <% elsif rt.type_sticker? %>
+                🎭 Figurinha
+              <% elsif rt.attachment.attached? %>
+                <% if rt.image? %>📷 Foto<% elsif rt.audio? %>🎤 Áudio<% elsif rt.video? %>🎥 Vídeo<% else %>📎 Arquivo<% end %>
+                <% if rt.content.present? %> · <%= rt.content.truncate(40) %><% end %>
+              <% else %>
+                <%= rt.content&.truncate(80) %>
+              <% end %>
+            </p>
+          </div>
         </div>
       <% end %>
 
@@ -94,15 +418,62 @@
         <%# Attachments %>
         <% if message.attachment.attached? %>
           <% if message.image? %>
-            <%= image_tag message.attachment, class: "rounded-md max-w-full max-h-64 object-cover mb-1" %>
+            <div class="mb-1 rounded-md overflow-hidden min-h-[120px] bg-black/20 relative"
+                 data-controller="image-viewer"
+                 data-image-viewer-url-value="<%= rails_blob_path(message.attachment) %>"
+                 data-image-viewer-filename-value="<%= message.attachment.filename %>"
+                 data-action="click->image-viewer#open">
+              <input type="checkbox"
+                     data-image-viewer-target="checkbox"
+                     class="image-viewer-checkbox absolute top-2 left-2 z-10 w-5 h-5 rounded border-2 border-white bg-black/50 text-[#00a884] focus:ring-0 hidden">
+              <img src="<%= rails_blob_path(message.attachment) %>"
+                   alt="<%= message.attachment.filename %>"
+                   class="rounded-md max-w-full max-h-64 w-full object-contain cursor-pointer block"
+                   loading="lazy"
+                   data-image-viewer-target="img">
+            </div>
           <% elsif message.video? %>
             <video controls class="rounded-md max-w-full max-h-64 mb-1">
               <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
             </video>
           <% elsif message.audio? %>
-            <audio controls class="w-full mb-1">
-              <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
-            </audio>
+            <%# WhatsApp-style audio player with speed control %>
+            <% audio_id = "audio-#{message.id}" %>
+            <div class="flex items-center gap-2 mb-1 w-full"
+                 style="min-width:200px;max-width:320px;"
+                 data-controller="audio-player"
+                 data-audio-player-src-value="<%= rails_blob_path(message.attachment) %>">
+              <audio data-audio-player-target="audio" preload="metadata" style="display:none;">
+                <source src="<%= rails_blob_path(message.attachment) %>" type="<%= message.attachment.content_type %>">
+              </audio>
+              <%# Play/Pause %>
+              <button type="button"
+                      data-audio-player-target="playBtn"
+                      data-action="click->audio-player#togglePlay"
+                      style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;flex-shrink:0;color:<%= mine ? '#fff' : '#111b21' %>;"
+                      title="Reproduzir">
+                <svg data-audio-player-target="playIcon" xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg data-audio-player-target="pauseIcon" xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;display:none;" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+              <%# Waveform + playhead %>
+              <div style="flex:1;position:relative;height:28px;cursor:pointer;min-width:0;"
+                   data-audio-player-target="seekBar"
+                   data-action="click->audio-player#seek">
+                <canvas data-audio-player-target="waveCanvas"
+                        style="position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:3px;"></canvas>
+                <div data-audio-player-target="playhead"
+                     style="position:absolute;top:0;bottom:0;left:0;width:2px;background:<%= mine ? 'rgba(255,255,255,0.9)' : '#00a884' %>;border-radius:1px;pointer-events:none;"></div>
+              </div>
+              <%# Time / duration %>
+              <span data-audio-player-target="timeLabel"
+                    style="font-size:11px;flex-shrink:0;min-width:2.8rem;text-align:right;font-variant-numeric:tabular-nums;color:<%= mine ? 'rgba(255,255,255,0.7)' : '#8696a0' %>;">0:00</span>
+              <%# Speed toggle %>
+              <button type="button"
+                      data-audio-player-target="speedBtn"
+                      data-action="click->audio-player#cycleSpeed"
+                      style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;padding:2px 5px;border-radius:8px;border:1px solid <%= mine ? 'rgba(255,255,255,0.3)' : '#374248' %>;background:none;cursor:pointer;flex-shrink:0;white-space:nowrap;color:<%= mine ? 'rgba(255,255,255,0.8)' : '#8696a0' %>;"
+                      title="Velocidade">1×</button>
+            </div>
           <% else %>
             <a href="<%= rails_blob_path(message.attachment) %>" target="_blank"
                class="flex items-center gap-2 text-[#53bdeb] hover:underline text-sm mb-1">
@@ -114,9 +485,40 @@
           <% end %>
         <% end %>
 
+        <%# Link preview: card clicável com ou sem imagem (sempre que houver URL no metadata) %>
+        <% if message.metadata.is_a?(Hash) && message.metadata["link_preview"].present? %>
+          <% lp = message.metadata["link_preview"] %>
+          <a href="<%= lp["url"] %>" target="_blank" rel="noopener noreferrer" class="block mb-2 rounded-lg overflow-hidden border border-[#2a3942] hover:border-[#00a884]/50 transition-colors max-w-full w-full min-w-0">
+            <% if lp["image_url"].present? %>
+              <img src="<%= lp["image_url"] %>" alt="<%= lp["title"].to_s.truncate(60) %>" class="w-full max-h-48 object-cover">
+            <% end %>
+            <div class="p-2 bg-[#2a3942]/80 flex items-center gap-2 min-h-[2.5rem]">
+              <% if lp["title"].present? %>
+                <p class="text-[#e9edef] text-sm font-medium line-clamp-2 flex-1 min-w-0"><%= lp["title"] %></p>
+              <% end %>
+              <p class="text-[#8696a0] text-xs truncate flex-1 min-w-0"><%= lp["url"] %></p>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00a884] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </div>
+          </a>
+        <% end %>
+
         <%# Text content %>
         <% if message.content.present? %>
-          <p class="text-[#e9edef] text-sm leading-relaxed whitespace-pre-wrap break-words"><%= message.content %></p>
+          <%# emoji_only messages are rendered outside the bubble (render_mode == :emoji_only) %>
+          <% unless render_mode == :emoji_only %>
+            <div class="message-text-wrapper w-full min-w-0 max-w-full" data-controller="message-expand">
+              <div data-message-expand-target="content" class="message-text-content text-[#e9edef] text-sm leading-relaxed break-words overflow-hidden max-h-40 transition-[max-height] duration-200">
+                <div class="prose-chat prose-chat-sm max-w-full">
+                  <%= render_markdown(message.content) %>
+                </div>
+              </div>
+              <button type="button" data-message-expand-target="toggle" data-action="click->message-expand#toggle" class="hidden mt-0.5 text-[#00a884] hover:text-[#00d494] text-xs font-medium">
+                <span data-message-expand-target="label">mostrar mais</span>
+              </button>
+            </div>
+          <% end %>
         <% end %>
 
         <%# Company department menu %>
@@ -175,7 +577,7 @@
           <% delivery = CampaignDelivery.includes(campaign: :marketing_template).find_by(id: message.campaign_delivery_id) %>
           <% tmpl = delivery&.campaign&.marketing_template %>
           <% if tmpl %>
-            <% locked = !mine && message.conversation.participants.find_by(user: current_user)&.interactively_locked? %>
+            <% locked = current_user.present? && !mine && message.conversation.participants.find_by(user: current_user)&.interactively_locked? %>
             <div data-controller="interactive-message"
                  data-interactive-message-delivery-id-value="<%= delivery.id %>"
                  data-interactive-message-locked-value="<%= locked %>">
@@ -183,7 +585,7 @@
               <%# Buttons %>
               <% if tmpl.has_buttons? %>
                 <div class="border-t border-black/20 mt-2 pt-2 space-y-1.5">
-                  <% tmpl.buttons.each do |btn| %>
+                  <% tmpl.buttons_list.each do |btn| %>
                     <% already_clicked = delivery.clicked_button_label == (btn["label"] || btn[:label]) %>
                     <button type="button"
                             data-interactive-message-target="button"
@@ -245,39 +647,98 @@
       <% end %>
 
       <%# Timestamp + status %>
-      <div class="flex items-center justify-end gap-1 mt-1">
-        <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
-        <% if mine && !message.deleted_for_everyone? %>
-          <% if message.status_read? %>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#53bdeb]" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
-          <% else %>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
+      <div class="flex items-center justify-end gap-1 mt-1 relative" data-controller="message-info">
+        <button type="button" data-action="click->message-info#toggle" data-message-info-target="trigger"
+                class="flex items-center gap-1 rounded px-1 -mr-1 <%= (mine && !message.deleted_for_everyone?) ? 'cursor-pointer hover:bg-white/5' : 'cursor-default' %> transition-colors"
+                <%= "disabled" unless mine && !message.deleted_for_everyone? %>
+                title="<%= (mine && !message.deleted_for_everyone?) ? 'Ver informações da mensagem' : '' %>">
+          <span class="text-[#8696a0] text-[10px]"><%= message.created_at.strftime("%H:%M") %></span>
+          <% if mine && !message.deleted_for_everyone? %>
+            <% if message.status_read? %>
+              <span class="inline-flex -ml-0.5" aria-label="Lido">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#53bdeb]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#53bdeb] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% elsif message.status_delivered? %>
+              <span class="inline-flex -ml-0.5" aria-label="Entregue (cliente recebeu)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0] -ml-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% elsif message.status_sent? %>
+              <span class="inline-flex" aria-label="Enviado (não recebido ainda)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              </span>
+            <% else %>
+              <span class="inline-flex" aria-label="Na fila (aguardando envio)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#8696a0]" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>
+              </span>
+            <% end %>
           <% end %>
+        </button>
+        <% if mine && !message.deleted_for_everyone? %>
+          <div data-message-info-target="popover" class="hidden absolute bottom-full right-0 mb-1 z-20 min-w-[220px] max-w-[280px] bg-[#202c33] border border-[#2a3942] rounded-lg shadow-xl py-2 px-3 text-left">
+            <p class="text-[#8696a0] text-xs font-medium uppercase tracking-wide mb-2">Informações da mensagem</p>
+            <ul class="space-y-1.5 text-sm">
+              <% if message.status_pending? %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Na fila</span>
+                  <span>Aguardando envio (quando o destinatário abrir o app)</span>
+                </li>
+              <% end %>
+              <li class="text-[#e9edef] flex items-center gap-2">
+                <span class="text-[#8696a0] w-24 flex-shrink-0">Enviada</span>
+                <span><%= (message.sent_at || message.created_at).strftime("%d/%m às %H:%M") %></span>
+              </li>
+              <% if message.delivered_at %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Recebida</span>
+                  <span><%= message.delivered_at.strftime("%d/%m às %H:%M") %></span>
+                </li>
+              <% end %>
+              <% if message.read_at %>
+                <li class="text-[#e9edef] flex items-center gap-2">
+                  <span class="text-[#8696a0] w-24 flex-shrink-0">Lida</span>
+                  <span><%= message.read_at.strftime("%d/%m às %H:%M") %></span>
+                </li>
+              <% end %>
+              <% conv = message.conversation %>
+              <% recipients = conv.participants.includes(:user).reject { |p| p.user_id == message.sender_id } %>
+              <% if conv.conversation_type_group? %>
+                <% recipients.each do |participant| %>
+                  <% rr = message.read_receipt_for(participant.user) %>
+                  <li class="text-[#e9edef] flex items-center justify-between gap-2">
+                    <span class="truncate"><%= participant.user.display_name %></span>
+                    <% if rr %>
+                      <span class="text-[#53bdeb] text-xs flex-shrink-0"><%= rr.read_at.strftime("%H:%M") %></span>
+                    <% else %>
+                      <span class="text-[#8696a0] text-xs flex-shrink-0">Não lido</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              <% else %>
+                <% other = recipients.first&.user %>
+                <% if other %>
+                  <li class="text-[#e9edef] flex items-center justify-between gap-2">
+                    <span class="text-[#8696a0] flex-shrink-0">Lido por <%= other.display_name %></span>
+                    <% rr = message.read_receipt_for(other) %>
+                    <% if rr %>
+                      <span class="text-[#53bdeb] text-xs"><%= rr.read_at.strftime("%d/%m às %H:%M") %></span>
+                    <% else %>
+                      <span class="text-[#8696a0] text-xs">Não lido</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              <% end %>
+            </ul>
+          </div>
         <% end %>
       </div>
     </div>
+    <% end %><%# /render_mode == :bubble %>
 
-    <%# Reactions bar (below the bubble) %>
-    <% grouped = message.reactions_grouped %>
-    <% if grouped.any? %>
-      <div id="reactions_<%= message.id %>"
-           class="flex flex-wrap gap-1 mt-1 <%= mine ? 'justify-end' : 'justify-start' %>">
-        <% grouped.each do |emoji, count| %>
-          <%= button_to message_reaction_path(message.conversation, message_id: message.id),
-                params: { emoji: emoji },
-                method: :post,
-                form: { data: { turbo: false } },
-                class: "flex items-center gap-0.5 bg-[#202c33] hover:bg-[#2a3942] border border-[#2a3942] rounded-full px-2 py-0.5 text-xs transition-colors" do %>
-            <span><%= emoji %></span>
-            <span class="text-[#8696a0]"><%= count %></span>
-          <% end %>
-        <% end %>
-      </div>
-    <% end %>
+    <%# Reactions bar (below the bubble) — always render wrapper so turbo_stream.replace works %>
+    <%= render "messages/message_reactions", message: message, current_user: current_user %>
 
-  </div>
+  </div><%# end wrapper_cls div %>
+  <% end %><%# end sticker / non-sticker %>
 </div>

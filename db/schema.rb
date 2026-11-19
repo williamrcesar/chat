@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
+ActiveRecord::Schema[7.2].define(version: 2026_03_18_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -44,7 +44,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
 
   create_table "campaign_deliveries", force: :cascade do |t|
     t.bigint "campaign_id", null: false
-    t.bigint "recipient_user_id", null: false
+    t.bigint "recipient_user_id"
     t.bigint "message_id"
     t.integer "status", default: 0, null: false
     t.string "clicked_button_label"
@@ -54,7 +54,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.datetime "clicked_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["campaign_id", "recipient_user_id"], name: "index_campaign_deliveries_on_campaign_id_and_recipient_user_id", unique: true
+    t.string "recipient_identifier"
+    t.index ["campaign_id", "recipient_user_id"], name: "index_campaign_deliveries_on_campaign_and_user_uniq", unique: true, where: "(recipient_user_id IS NOT NULL)"
     t.index ["campaign_id"], name: "index_campaign_deliveries_on_campaign_id"
     t.index ["message_id"], name: "index_campaign_deliveries_on_message_id"
     t.index ["recipient_user_id"], name: "index_campaign_deliveries_on_recipient_user_id"
@@ -186,6 +187,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.bigint "forwarded_from_id"
     t.boolean "message_type_marketing", default: false, null: false
     t.bigint "campaign_delivery_id"
+    t.integer "sequence", null: false
+    t.datetime "sent_at"
+    t.datetime "delivered_at"
+    t.datetime "read_at"
+    t.index ["conversation_id", "sequence"], name: "index_messages_on_conversation_id_and_sequence", unique: true
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["created_at"], name: "index_messages_on_created_at"
     t.index ["deleted_at"], name: "index_messages_on_deleted_at"
@@ -207,6 +213,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.boolean "pinned", default: false, null: false
     t.datetime "interactive_locked_until"
     t.bigint "interactive_message_id"
+    t.string "notification_sound"
+    t.string "notification_color"
+    t.string "notification_icon_type"
     t.index ["archived"], name: "index_participants_on_archived"
     t.index ["conversation_id"], name: "index_participants_on_conversation_id"
     t.index ["pinned"], name: "index_participants_on_pinned"
@@ -223,6 +232,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.index ["message_id", "user_id"], name: "index_read_receipts_on_message_id_and_user_id", unique: true
     t.index ["message_id"], name: "index_read_receipts_on_message_id"
     t.index ["user_id"], name: "index_read_receipts_on_user_id"
+  end
+
+  create_table "stickers", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_stickers_on_user_id"
   end
 
   create_table "templates", force: :cascade do |t|
@@ -257,6 +274,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
     t.datetime "updated_at", null: false
     t.integer "role", default: 0, null: false
     t.string "nickname"
+    t.string "default_notification_sound", default: "default", null: false
+    t.string "default_notification_color"
+    t.string "default_notification_icon_type", default: "avatar", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["jti"], name: "index_users_on_jti", unique: true
     t.index ["nickname"], name: "index_users_on_nickname", unique: true
@@ -302,6 +322,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_02_21_000022) do
   add_foreign_key "participants", "users"
   add_foreign_key "read_receipts", "messages"
   add_foreign_key "read_receipts", "users"
+  add_foreign_key "stickers", "users"
   add_foreign_key "templates", "users", column: "created_by_id"
   add_foreign_key "web_push_subscriptions", "users"
 end

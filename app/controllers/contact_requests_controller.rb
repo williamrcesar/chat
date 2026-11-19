@@ -1,5 +1,5 @@
 class ContactRequestsController < ApplicationController
-  before_action :set_request, only: %i[accept block]
+  before_action :set_request, only: %i[ accept block ]
 
   # GET /contact_requests
   def index

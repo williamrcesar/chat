@@ -11,7 +11,7 @@ class ConversationAssignment < ApplicationRecord
     queued:      4
   }, prefix: true
 
-  scope :open,    -> { where(status: %i[pending active queued]) }
+  scope :open,    -> { where(status: %i[ pending active queued ]) }
   scope :recent,  -> { order(created_at: :desc) }
 
   after_save :broadcast_assignment_update

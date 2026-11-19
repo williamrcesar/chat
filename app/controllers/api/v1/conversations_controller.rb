@@ -1,7 +1,7 @@
 module Api
   module V1
     class ConversationsController < BaseController
-      before_action :set_conversation, only: %i[show participants]
+      before_action :set_conversation, only: %i[ show participants ]
 
       def index
         @conversations = current_user.conversations.includes(:users, :messages).recent

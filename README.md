@@ -4,6 +4,8 @@ A full-featured WhatsApp-like messaging web app built with Ruby on Rails 7.2. Re
 
 ---
 
+Validation results and remaining provider/runtime checks: [docs/VALIDATION.md](docs/VALIDATION.md). Current feature inventory: [docs/FEATURES_AND_BACKLOG.md](docs/FEATURES_AND_BACKLOG.md).
+
 ## Tech Stack
 
 | Layer          | Technology                                   |
@@ -459,6 +461,41 @@ openssl rand -hex 64  # → DEVISE_JWT_SECRET_KEY
 
 ---
 
+## Web Push Notifications (PWA)
+
+Notificações no browser quando chega uma nova mensagem. Cada **dispositivo/navegador** precisa ativar notificações uma vez (botão "Enable notifications" / "Notifications ON").
+
+### Setup
+
+1. **Chaves VAPID** (uma vez por projeto):
+   ```bash
+   bundle exec rake webpush:generate_vapid_keys
+   ```
+   Copie as duas linhas para o `.env` (`VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY`).
+
+2. **Sidekiq a correr** — o envio de push é feito em job em background. Com `bin/dev`, Sidekiq já sobe.
+
+3. **Cada utilizador** deve clicar em "Enable notifications" (ícone de sino) **em cada dispositivo** onde quer receber notificações (Windows, telemóvel, etc.).
+
+### Por que não recebo notificações?
+
+| Situação | O que fazer |
+|----------|-------------|
+| **Windows / Chrome** | Confirmar que o site tem permissão em Definições → Privacidade → Notificações. Abrir a consola (F12) e verificar erros ao clicar em "Enable notifications". |
+| **Telemóvel (iOS Safari)** | Web Push no iPhone **só funciona em PWA**: abrir o site no Safari → Partilhar → "Adicionar ao Ecrã Início". Depois abrir a app pelo ícone no ecrã inicial e aí ativar notificações. Requer **iOS 16.4+**. |
+| **Telemóvel (Chrome Android)** | Ativar notificações no site (botão no chat). Se usar apenas em browser, permitir notificações quando o Chrome pedir. |
+| **Nada acontece ao enviar mensagem** | Ver os logs do servidor (onde corre `bin/dev` ou Sidekiq). Deve aparecer `[WebPush] Sent to N subscription(s)` ou `[WebPush] User X has no subscriptions`. Se aparecer "no subscriptions", o destinatário não ativou notificações naquele dispositivo. |
+| **Acesso por IP (ex.: 192.168.x.x)** | Push exige **contexto seguro**: `https://` ou `localhost`. Com `http://192.168.x.x` o browser pode bloquear. Use um túnel HTTPS (ex.: ngrok) ou localhost para testar. |
+
+### Verificar no servidor
+
+Ao enviar uma mensagem, nos logs deve aparecer algo como:
+- `[WebPush] Sent to 1 subscription(s) for user_id=3` — push enviado.
+- `[WebPush] User 3 has no subscriptions` — destinatário não ativou notificações nesse dispositivo.
+- `[WebPush] Skipped: VAPID keys not set` — faltam chaves no `.env`.
+
+---
+
 ## TODO — Upcoming Features
 
 - [ ] **End-to-end encryption** (Signal Protocol / libsodium)
@@ -480,6 +517,7 @@ openssl rand -hex 64  # → DEVISE_JWT_SECRET_KEY
 - [x] **Real-time Kanban board** for campaign delivery tracking ✅
 - [x] **Interactive Message Lock** (24h block until button/list clicked) ✅
 - [x] **Company Multi-Agent Inbox** (departments, routing, supervisor dashboard) ✅
+- [x] **Admin: monitor and impersonate conversations** (view all ongoing conversations, read-only or respond as attendant) ✅
 - [ ] **Disappearing messages**
 - [ ] **Stories / Status**#
 - [ ] **Block users**
@@ -491,6 +529,25 @@ openssl rand -hex 64  # → DEVISE_JWT_SECRET_KEY
 - [ ] **AI attendant integration** (connect `attendant_type: :ai` to an LLM API)
 - [ ] **SLA timers** (alert supervisor when ticket is unanswered too long)
 - [ ] **Company analytics** (response time, CSAT score)
+
+---
+
+## Admin: monitor and impersonate conversations
+
+Users with **admin** role or **company supervisors** can open the Admin area and go to **Conversas** to see ongoing conversations:
+
+- **Global scope** (admin only): conversations with recent activity (configurable time window), with search by user name/nickname.
+- **Company scope**: open tickets (pending/active/queued) for a company; supervisors see only their company.
+
+From the list, **Ver chat** opens a three-column panel:
+
+- **Left**: list of conversations in the current scope.
+- **Center**: live message thread (ActionCable). Two modes:
+  - **Monitor**: read-only; new messages appear in real time.
+  - **Impersonate**: choose a participant (e.g. the attendant) and send messages as them. The message is stored with `sender_id` of the impersonated user and `metadata["impersonated"] => true`, `metadata["admin_id"] => current_user.id` for audit.
+- **Right**: conversation and ticket details (company, status, attendant).
+
+Supervisors can only impersonate attendants of their company. From the **Company Dashboard** (Kanban), the link **Ver chat (admin)** opens that conversation in the admin panel in monitor mode.
 
 ---
 

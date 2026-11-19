@@ -1,8 +1,8 @@
-module Company
+module CompanyPortal
   class DashboardController < BaseController
     def index
       @assignments_by_status = @current_company.conversation_assignments
-                                               .includes(:conversation, :company_attendant => :user)
+                                               .includes(:conversation, company_attendant: :user)
                                                .order(created_at: :desc)
                                                .group_by(&:status)
 

@@ -1,6 +1,6 @@
 module Marketing
   class TemplatesController < BaseController
-    before_action :set_template, only: %i[show edit update destroy preview]
+    before_action :set_template, only: %i[ show edit update destroy preview ]
 
     def index
       @templates = current_user.marketing_templates.order(created_at: :desc)
@@ -49,9 +49,9 @@ module Marketing
     def template_params
       params.require(:marketing_template).permit(
         :name, :header_type, :header_text, :body, :footer, :header_image,
-        buttons: %i[label type value],
-        list_header: %i[text],
-        list_sections: [ :title, rows: %i[id title desc] ]
+        buttons: %i[ label type value ],
+        list_header: %i[ text ],
+        list_sections: [ :title, rows: %i[ id title desc ] ]
       )
     end
   end

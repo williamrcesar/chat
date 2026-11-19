@@ -2,7 +2,7 @@ module Api
   module V1
     class MessagesController < BaseController
       before_action :set_conversation
-      before_action :set_message, only: %i[destroy]
+      before_action :set_message, only: %i[ destroy ]
 
       def index
         page = (params[:page] || 1).to_i

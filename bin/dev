@@ -5,6 +5,17 @@ if ! gem list foreman -i --silent; then
   gem install foreman
 fi
 
+# Remove stale Rails server PID so "A server is already running" doesn't block startup
+if [ -f tmp/pids/server.pid ]; then
+  OLD_PID=$(cat tmp/pids/server.pid 2>/dev/null)
+  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    echo "Stopping existing Rails server (pid $OLD_PID)..."
+    kill "$OLD_PID" 2>/dev/null
+    sleep 1
+  fi
+  rm -f tmp/pids/server.pid
+fi
+
 # Default to port 3000 if not specified
 export PORT="${PORT:-3000}"
 
@@ -12,5 +23,8 @@ export PORT="${PORT:-3000}"
 # but avoid loading until `debugger` is called
 export RUBY_DEBUG_OPEN="true"
 export RUBY_DEBUG_LAZY="true"
+
+# Suppress Gem::Platform and other Ruby warnings from vendor/bundle Bundler
+export RUBYOPT="${RUBYOPT:+$RUBYOPT }-W0"
 
 exec foreman start -f Procfile.dev "$@"

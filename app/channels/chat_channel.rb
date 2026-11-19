@@ -8,14 +8,21 @@ class ChatChannel < ApplicationCable::Channel
       current_user.touch_online!
       broadcast_presence(true)
       broadcast_interactive_lock_state
+      mark_sent_messages_delivered_for_subscriber!
     else
-      reject
+      @conversation = Conversation.find_by(id: params[:conversation_id])
+      if @conversation && admin_can_view_conversation?
+        # Admin or supervisor viewing a conversation they are not a participant in (read-only + new_message updates)
+        stream_from "admin_conversation_#{@conversation.id}"
+      else
+        reject
+      end
     end
   end
 
   def unsubscribed
-    current_user.touch_offline!
-    broadcast_presence(false) if @conversation
+    current_user.touch_offline! if @conversation && current_user.conversations.exists?(@conversation.id)
+    broadcast_presence(false) if @conversation && current_user.conversations.exists?(@conversation.id)
     stop_all_streams
   end
 
@@ -44,7 +51,32 @@ class ChatChannel < ApplicationCable::Channel
     participant&.mark_read!
   end
 
+  # Destinatário confirma que recebeu a mensagem → 2 marcas cinzas na hora para o remetente
+  def message_received(data)
+    return unless @conversation
+    message_id = data["message_id"].presence || data[:message_id]
+    return unless message_id
+
+    message = Message.find_by(id: message_id, conversation_id: @conversation.id)
+    return unless message
+    return if message.sender_id == current_user.id # só destinatário confirma
+
+    if message.status_sent?
+      message.mark_delivered!
+      MessageUpdateBroadcastJob.perform_now(message_id)
+    end
+  end
+
   private
+
+  def admin_can_view_conversation?
+    return false unless @conversation
+    return true if current_user.role_admin?
+    return false unless current_user.company_attendants.supervisors.exists?
+    return false unless @conversation.conversation_assignment.present?
+    company_ids = current_user.company_attendants.supervisors.pluck(:company_id)
+    @conversation.conversation_assignment.company_id.in?(company_ids)
+  end
 
   def broadcast_interactive_lock_state
     return unless @conversation
@@ -75,5 +107,18 @@ class ChatChannel < ApplicationCable::Channel
         }
       )
     end
+  end
+
+  # Usuário ficou online (abriu o app e uma conversa) → marcar como entregues todas as mensagens
+  # "sent" dirigidas a ele em TODAS as conversas. 1 check = offline; 2 checks cinzas = online.
+  def mark_sent_messages_delivered_for_subscriber!
+    Message
+      .where(conversation_id: current_user.conversation_ids)
+      .where(status: Message.statuses[:sent])
+      .where.not(sender_id: current_user.id)
+      .find_each do |message|
+        message.mark_delivered!
+        MessageUpdateBroadcastJob.perform_later(message.id)
+      end
   end
 end

@@ -61,7 +61,7 @@ end
 
 Template.find_or_create_by!(name: "Suporte - Confirmação") do |t|
   t.category   = "support"
-  t.content    = "Olá {{nome}}, recebemos seu chamado #{{ticket}}. Nossa equipe entrará em contato em até {{prazo}}."
+  t.content    = 'Olá {{nome}}, recebemos seu chamado #{{ticket}}. Nossa equipe entrará em contato em até {{prazo}}.'
   t.variables  = [ "nome", "ticket", "prazo" ]
   t.created_by = alice
 end

@@ -1,5 +1,5 @@
 class TemplatesController < ApplicationController
-  before_action :set_template, only: %i[show edit update destroy]
+  before_action :set_template, only: %i[ show edit update destroy ]
 
   def index
     @templates = Template.order(:category, :name)
