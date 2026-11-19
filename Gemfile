@@ -59,6 +59,8 @@ group :development do
 end
 
 group :test do
+  # Rails 7.2's test runner is not compatible with Minitest 6's run signature.
+  gem "minitest", "~> 5.25"
   gem "capybara"
   gem "selenium-webdriver"
 end

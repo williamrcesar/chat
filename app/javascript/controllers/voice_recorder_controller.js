@@ -92,6 +92,7 @@ export default class extends Controller {
   // ─── Mic pointer ────────────────────────────────────────────────────────
 
   pointerDown(e) {
+    if (this._state === "requesting") return
     if (this._state === "review") return
     if (this._state === "locked" || this._state === "holding") {
       this._stopRecording(); return
@@ -123,6 +124,10 @@ export default class extends Controller {
   _onPointerUp() {
     document.removeEventListener("pointermove", this._boundMove)
     document.removeEventListener("pointerup",   this._boundUp)
+    if (this._state === "requesting") {
+      this._releasedBeforeStart = true
+      return
+    }
     if (this._state !== "holding") return
     const held = Date.now() - this._startTime
     if (held < 400) {
@@ -180,7 +185,8 @@ export default class extends Controller {
     }
   }
 
-  sendLocked() {
+  async sendLocked() {
+    if (this._sending) return
     if (!this._savedBlob) {
       console.error("[VoiceRecorder] sendLocked: no blob saved")
       return
@@ -188,19 +194,41 @@ export default class extends Controller {
     this._stopPreview()
     const blob = this._savedBlob
     const ext  = this._savedExt
-    this._savedBlob = null
-    this._state = "idle"
-    this._hideAll()
-    this._syncButtons()
-    this._sendAudioBlob(blob, ext)
+    this._sending = true
+    if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.disabled = true
+    try {
+      await this._sendAudioBlob(blob, ext)
+      this._savedBlob = null
+      this._state = "idle"
+      this._hideAll()
+      this._syncButtons()
+    } catch (err) {
+      console.error("[VoiceRecorder] send failed:", err)
+      this._enterReview(blob)
+      window.alert("Não foi possível enviar o áudio. Sua gravação foi mantida para tentar novamente.")
+    } finally {
+      this._sending = false
+      if (this.hasSendVoiceBtnTarget) this.sendVoiceBtnTarget.disabled = false
+    }
   }
 
   // ─── Recording internals ────────────────────────────────────────────────
 
   async _beginRecording() {
+    const request = Symbol("recording")
+    this._recordingRequest = request
+    this._releasedBeforeStart = false
+    this._state = "requesting"
     try {
-      this._stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (this._recordingRequest !== request) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+      this._stream = stream
     } catch (err) {
+      if (this._recordingRequest !== request) return
+      this._state = "idle"
       console.warn("[VoiceRecorder] mic denied:", err)
       this._showError("Permissão de microfone negada")
       return
@@ -229,6 +257,7 @@ export default class extends Controller {
     this._showHoldingUI()
     this._startTimer()
     this._startLiveWaveform()
+    if (this._releasedBeforeStart) this._lockRecording()
   }
 
   _lockRecording() {
@@ -290,6 +319,7 @@ export default class extends Controller {
   }
 
   _cancelRecording() {
+    this._recordingRequest = null
     this._stopTimers()
     this._stopStream()
     this._stopPreview()
@@ -307,6 +337,7 @@ export default class extends Controller {
   }
 
   _abort() {
+    this._recordingRequest = null
     this._stopTimers()
     this._stopStream()
     document.removeEventListener("pointermove", this._boundMove)
@@ -589,13 +620,13 @@ export default class extends Controller {
     const fd   = new FormData()
     fd.append("audio", new File([blob], `voice.${ext}`, { type: blob.type }))
 
-    fetch(this.sendPathValue, {
+    return fetch(this.sendPathValue, {
       method:  "POST",
       headers: { "X-CSRF-Token": csrf, "Accept": "text/vnd.turbo-stream.html" },
       body:    fd
     })
       .then(r => {
-        if (!r.ok) { console.error("[VoiceRecorder] server error:", r.status, r.statusText); ph?.remove(); return }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.text()
       })
       .then(html => {
@@ -605,6 +636,7 @@ export default class extends Controller {
       .catch(err => {
         console.error("[VoiceRecorder] fetch error:", err)
         ph?.remove()
+        throw err
       })
   }
 
