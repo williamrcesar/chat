@@ -30,7 +30,7 @@
     <% end %>
 
     <div class="grid gap-4">
-      <% Template::CATEGORIES.each do |category| %>
+      <% ::Template::CATEGORIES.each do |category| %>
         <% category_templates = @templates.select { |t| t.category == category } %>
         <% next if category_templates.empty? %>
 

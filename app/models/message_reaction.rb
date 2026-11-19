@@ -1,5 +1,31 @@
 class MessageReaction < ApplicationRecord
-  ALLOWED_EMOJIS = %w[👍 ❤️ 😂 😮 😢 🙏].freeze
+  # Used by reactions (validation) and by the emoji picker modal.
+  EMOJI_CATEGORIES = {
+    "Recentes / Favoritos" => %w[👍 ❤️ 😂 🙏 🔥 🎉 😮 😢],
+    "Carinhas" => %w[
+      😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 😉 😍 😘 😜 🤪 🤔 😮 😴 😭 😡 😎 🥳
+    ],
+    "Gestos" => %w[
+      👍 👎 👏 🙌 🤝 🙏 🤞 ✌️ 🤟 🤘 👊 ✊ 🤙 👋 🫶
+    ],
+    "Corações" => %w[
+      ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❤️‍🔥 ❤️‍🩹 💖 💘 💝 💞 💓 💗 💟
+    ],
+    "Objetos / Símbolos" => %w[
+      ✅ ❌ ☑️ ⚠️ ⭐️ 🌟 🔥 💯 🎯 📌 📎 🔔 🧠 💡 🕐 🗑️
+    ],
+    "Animais / Natureza" => %w[
+      🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🌿 🌸 🌻 🌙 ☀️ 🌧️
+    ],
+    "Comida" => %w[
+      🍕 🍔 🍟 🌭 🍿 🥤 ☕️ 🍺 🍷 🍩 🍪 🍫 🍎 🍌 🍉 🍓 🍇
+    ],
+    "Viagem / Lugares" => %w[
+      🚗 🚌 🚕 🚲 ✈️ 🚀 🛳️ 🗺️ 🏖️ 🏙️ 🏠 ⛺️
+    ]
+  }.freeze
+
+  ALLOWED_EMOJIS = EMOJI_CATEGORIES.values.flatten.uniq.freeze
 
   belongs_to :message
   belongs_to :user
@@ -7,8 +33,10 @@ class MessageReaction < ApplicationRecord
   validates :emoji, inclusion: { in: ALLOWED_EMOJIS }
   validates :user_id, uniqueness: { scope: [ :message_id, :emoji ] }
 
-  after_create_commit :broadcast_reaction_update
-  after_destroy_commit :broadcast_reaction_update
+  before_destroy :capture_message_id_for_broadcast
+
+  after_create_commit  -> { ReactionBroadcastJob.perform_later(message_id: message_id, event: "created", reaction_id: id) }
+  after_destroy_commit -> { ReactionBroadcastJob.perform_later(message_id: @message_id_for_broadcast, event: "destroyed") }
 
   def self.grouped_for(message)
     where(message: message)
@@ -18,17 +46,7 @@ class MessageReaction < ApplicationRecord
 
   private
 
-  def broadcast_reaction_update
-    counts = message.reactions_grouped
-    message.conversation.participants.includes(:user).each do |participant|
-      ChatChannel.broadcast_to(
-        [ message.conversation, participant.user ],
-        {
-          type: "reaction_update",
-          message_id: message_id,
-          reactions: counts
-        }
-      )
-    end
+  def capture_message_id_for_broadcast
+    @message_id_for_broadcast = message_id
   end
 end

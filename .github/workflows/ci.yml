@@ -6,8 +6,10 @@ on:
     branches: [ main ]
 
 jobs:
+  # Keep the runner compatible with the current Ruby 3.2.3 baseline.
+  # ubuntu-latest now selects 26.04, which does not provide this patch release.
   scan_ruby:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -26,7 +28,7 @@ jobs:
         run: bin/brakeman --no-pager --no-exit-on-warn
 
   scan_js:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -44,8 +46,16 @@ jobs:
       - name: Scan for security vulnerabilities in JavaScript dependencies
         run: bin/importmap audit
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test JavaScript behavior
+        run: node --test test/javascript/*.mjs
+
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,7 +73,7 @@ jobs:
         run: bin/rubocop -f github
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     services:
       postgres:
@@ -100,7 +110,7 @@ jobs:
       - name: Run tests
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/chat_test
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY_BASE: test-secret-key-base-for-ci-only
           DEVISE_JWT_SECRET_KEY: test-jwt-secret-key-for-ci-only

@@ -3,11 +3,21 @@
 <div class="max-w-lg mx-auto">
   <div class="mb-6">
     <h1 class="text-2xl font-semibold text-white">Adicionar Atendente</h1>
-    <p class="text-[#8696a0] text-sm mt-1">Adicione um usuário à equipe de atendimento</p>
+    <p class="text-[#8696a0] text-sm mt-1">Crie um novo usuário para a equipe ou vincule um usuário que já tem conta.</p>
+  </div>
+
+  <%# Mode toggle %>
+  <div class="flex gap-2 mb-4 p-1 bg-[#2a3942] rounded-lg">
+    <button type="button" id="mode-new-user" class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors bg-[#00a884] text-white">
+      Criar novo usuário
+    </button>
+    <button type="button" id="mode-link-existing" class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors text-[#8696a0] hover:text-white">
+      Vincular usuário existente
+    </button>
   </div>
 
   <div class="bg-[#202c33] rounded-xl p-6">
-    <%= form_with model: [:company, @attendant], class: "space-y-5" do |f| %>
+    <%= form_with model: @attendant, url: company_attendants_path, method: :post, class: "space-y-5", id: "attendant-form" do |f| %>
       <% if @attendant.errors.any? %>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
           <% @attendant.errors.full_messages.each do |msg| %>
@@ -15,15 +25,59 @@
           <% end %>
         </div>
       <% end %>
+      <% if flash[:alert] %>
+        <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+          <p class="text-red-400 text-sm"><%= flash[:alert] %></p>
+        </div>
+      <% end %>
 
-      <div>
-        <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">
-          @Nickname ou Email do usuário *
-        </label>
-        <input type="text" name="company_attendant[user_identifier]"
-               placeholder="@alice ou alice@email.com"
-               class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
-        <p class="text-[#8696a0] text-xs mt-1">O usuário precisa ter uma conta no sistema.</p>
+      <%# Block: Create new user %>
+      <div id="block-new-user" class="space-y-5">
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">E-mail *</label>
+          <input type="email" name="company_attendant[new_user_email]" id="new_user_email"
+                 placeholder="atendente@empresa.com"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Senha *</label>
+          <input type="password" name="company_attendant[new_user_password]" id="new_user_password"
+                 placeholder="Mínimo 6 caracteres"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Confirmar senha *</label>
+          <input type="password" name="company_attendant[new_user_password_confirmation]" id="new_user_password_confirmation"
+                 placeholder="Repita a senha"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">Nome</label>
+          <input type="text" name="company_attendant[new_user_display_name]" id="new_user_display_name"
+                 placeholder="Nome do atendente"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+          <p class="text-[#8696a0] text-xs mt-1">Se deixar em branco, usamos o nome antes do @ do e-mail.</p>
+        </div>
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">@Nickname (opcional)</label>
+          <input type="text" name="company_attendant[new_user_nickname]" id="new_user_nickname"
+                 placeholder="@atendente1"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+          <p class="text-[#8696a0] text-xs mt-1">3–30 caracteres, letras minúsculas, números e _.</p>
+        </div>
+      </div>
+
+      <%# Block: Link existing user %>
+      <div id="block-link-existing" class="hidden">
+        <div>
+          <label class="block text-[#8696a0] text-xs font-semibold mb-1 uppercase tracking-wide">
+            @Nickname ou E-mail do usuário *
+          </label>
+          <input type="text" name="company_attendant[user_identifier]" id="user_identifier"
+                 placeholder="@alice ou alice@email.com"
+                 class="w-full bg-[#2a3942] text-white placeholder-[#8696a0] rounded-lg px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#00a884]">
+          <p class="text-[#8696a0] text-xs mt-1">O usuário precisa já ter uma conta no sistema.</p>
+        </div>
       </div>
 
       <div>
@@ -84,3 +138,43 @@
     <% end %>
   </div>
 </div>
+
+<script>
+  (function() {
+    var modeNew = document.getElementById("mode-new-user");
+    var modeLink = document.getElementById("mode-link-existing");
+    var blockNew = document.getElementById("block-new-user");
+    var blockLink = document.getElementById("block-link-existing");
+    var newEmail = document.getElementById("new_user_email");
+    var userIdentifier = document.getElementById("user_identifier");
+
+    function showNewUser() {
+      blockNew.classList.remove("hidden");
+      blockLink.classList.add("hidden");
+      modeNew.classList.add("bg-[#00a884]", "text-white");
+      modeNew.classList.remove("text-[#8696a0]");
+      modeLink.classList.remove("bg-[#00a884]", "text-white");
+      modeLink.classList.add("text-[#8696a0]");
+      newEmail.removeAttribute("disabled");
+      userIdentifier.setAttribute("disabled", "disabled");
+      userIdentifier.value = "";
+    }
+    function showLinkExisting() {
+      blockNew.classList.add("hidden");
+      blockLink.classList.remove("hidden");
+      modeLink.classList.add("bg-[#00a884]", "text-white");
+      modeLink.classList.remove("text-[#8696a0]");
+      modeNew.classList.remove("bg-[#00a884]", "text-white");
+      modeNew.classList.add("text-[#8696a0]");
+      userIdentifier.removeAttribute("disabled");
+      newEmail.setAttribute("disabled", "disabled");
+      newEmail.value = "";
+      document.getElementById("new_user_password").value = "";
+      document.getElementById("new_user_password_confirmation").value = "";
+    }
+
+    modeNew.addEventListener("click", showNewUser);
+    modeLink.addEventListener("click", showLinkExisting);
+    showNewUser();
+  })();
+</script>

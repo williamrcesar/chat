@@ -1,4 +1,4 @@
-module Company
+module CompanyPortal
   # Called when a customer clicks a department option in a company menu message.
   # This is a public-facing endpoint (no company membership required).
   class MenuClicksController < ApplicationController

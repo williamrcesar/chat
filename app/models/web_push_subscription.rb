@@ -28,8 +28,9 @@ class WebPushSubscription < ApplicationRecord
       }
     )
   rescue Webpush::ExpiredSubscription, Webpush::InvalidSubscription
+    Rails.logger.info("[WebPush] Subscription expired/invalid, removed: #{endpoint[0..60]}...")
     destroy
   rescue => e
-    Rails.logger.error("[WebPush] Failed to deliver to #{endpoint}: #{e.message}")
+    Rails.logger.error("[WebPush] Failed to deliver: #{e.class} #{e.message}")
   end
 end

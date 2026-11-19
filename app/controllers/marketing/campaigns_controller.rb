@@ -1,6 +1,6 @@
 module Marketing
   class CampaignsController < BaseController
-    before_action :set_campaign, only: %i[ show launch pause deliveries ]
+    before_action :set_campaign, only: %i[ show edit update launch pause ]
 
     def index
       @campaigns = current_user.marketing_campaigns
@@ -11,6 +11,7 @@ module Marketing
     def show
       @deliveries_by_status = @campaign.campaign_deliveries
                                        .includes(:recipient_user)
+                                       .order(id: :asc)
                                        .group_by(&:status)
     end
 
@@ -26,6 +27,24 @@ module Marketing
       else
         @templates = current_user.marketing_templates.order(:name)
         render :new, status: :unprocessable_entity
+      end
+    end
+
+    def edit
+      return redirect_to marketing_campaign_path(@campaign), alert: "Só é possível editar campanhas em rascunho." unless @campaign.status_draft?
+      @templates = current_user.marketing_templates.order(:name)
+    end
+
+    def update
+      unless @campaign.status_draft?
+        redirect_to marketing_campaign_path(@campaign), alert: "Só é possível editar campanhas em rascunho."
+        return
+      end
+      if @campaign.update(campaign_params)
+        redirect_to marketing_campaign_path(@campaign), notice: "Campanha atualizada."
+      else
+        @templates = current_user.marketing_templates.order(:name)
+        render :edit, status: :unprocessable_entity
       end
     end
 
