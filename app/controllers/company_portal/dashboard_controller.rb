@@ -1,4 +1,4 @@
-module Company
+module CompanyPortal
   class DashboardController < BaseController
     def index
       @assignments_by_status = @current_company.conversation_assignments

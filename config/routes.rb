@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   root to: redirect("/users/sign_in")
 
   resources :conversations, only: %i[ index show create ] do
+    resource :notification_settings, only: %i[ show update ], controller: "conversations/notification_settings"
     member do
       post   :add_participant
       delete "participants/:user_id", action: :remove_participant, as: :remove_participant
@@ -24,6 +25,8 @@ Rails.application.routes.draw do
       collection do
         post :from_template
         post :forward
+        post :send_sticker
+        post :send_voice
         get  :search
       end
       member do
@@ -41,6 +44,10 @@ Rails.application.routes.draw do
   resource  :profile, only: %i[ show edit update ]
   resources :templates
 
+  resources :stickers, only: %i[ index create update destroy ]
+
+  post "calls", to: "calls#create"
+
   # Contact requests (nickname-based friendship system)
   resources :contact_requests, only: %i[ index create ] do
     member do
@@ -54,7 +61,7 @@ Rails.application.routes.draw do
     resources :templates do
       member { get :preview }
     end
-    resources :campaigns, only: %i[ index show new create ] do
+    resources :campaigns, only: %i[ index show new create edit update ] do
       member do
         post :launch
         post :pause
@@ -71,8 +78,8 @@ Rails.application.routes.draw do
   # Company accounts — creation and public profile
   resources :companies, only: %i[ new create show ]
 
-  # Company namespace — dashboard, attendants, settings, assignments
-  namespace :company do
+  # Company portal (module CompanyPortal to avoid conflict with Company model)
+  scope path: "company", as: "company", module: "company_portal" do
     get "dashboard", to: "dashboard#index", as: :dashboard
     resource  :settings, only: %i[ show edit update ]
 
@@ -96,13 +103,21 @@ Rails.application.routes.draw do
     collection { get :vapid_public_key }
   end
 
+  # Signed URL for push notification icon (avatar, color, or custom image)
+  get "notification_icons/show", to: "notification_icons#show", as: :notification_icon
+
   # Admin dashboard
   namespace :admin do
     root to: "dashboard#index"
     resources :users, only: %i[ index show edit update destroy ] do
       member { patch :toggle_admin }
     end
-    resources :conversations, only: %i[ index show destroy ]
+    resources :conversations, only: %i[ index show destroy ] do
+      member do
+        patch :mode
+        post  :send_message
+      end
+    end
   end
 
   # API v1 (JWT auth — for future mobile apps)

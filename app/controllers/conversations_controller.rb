@@ -2,31 +2,44 @@ class ConversationsController < ApplicationController
   before_action :set_conversation, only: %i[ show add_participant remove_participant archive unarchive toggle_pin ]
 
   def index
-    @conversations = current_user.conversations
-                                 .sorted_for(current_user)
-                                 .includes(:users, :messages, :company)
-                                 .where(participants: { archived: false })
-    @archived_conversations = current_user.conversations
-                                          .archived(current_user)
-                                          .includes(:users, :messages, :company)
-                                          .recent
+    # Ordenar: fixadas primeiro (máx 10), depois por última atividade (última mensagem enviada/recebida = conversations.updated_at)
+    ordered_ids = Conversation.joins(:participants)
+      .where(participants: { user_id: current_user.id, archived: false })
+      .order("participants.pinned DESC, conversations.updated_at DESC")
+      .pluck(:id).uniq
+    @conversations = Conversation.where(id: ordered_ids).includes(:users, :messages, :company, :participants)
+    @conversations = @conversations.sort_by { |c| ordered_ids.index(c.id) }
+
+    archived_ids = current_user.conversations.archived(current_user).pluck(:id).uniq
+    @archived_conversations = Conversation.where(id: archived_ids).includes(:users, :messages, :company, :participants).recent
     @users = User.where.not(id: current_user.id).order(:display_name)
     @pending_requests_count = current_user.pending_contact_requests_count
   end
 
   def show
     authorize @conversation
+    # Evitar cache do navegador ao abrir conversa (sempre mensagens e status atualizados)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     @pagy, @messages = pagy(
       @conversation.messages
                    .visible
-                   .includes(:sender, :reply_to, :reactions, attachment_attachment: :blob)
+                   .includes(:sender, :reply_to, :reactions, :read_receipts, conversation: { participants: :user }, attachment_attachment: :blob)
                    .order(created_at: :desc),
-      items: 40
+      limit: 40
     )
     # Reverse so oldest appears at top, newest at bottom
     @messages = @messages.reverse
     @participant = @conversation.participants.find_by(user: current_user)
+    @had_unread = @conversation.unread_count_for(current_user)
+    # Primeira mensagem não lida (para mostrar divisor "Mensagens não lidas" no estilo WhatsApp)
+    last_read = @participant&.last_read_at || Time.at(0)
+    first_unread = @messages.find { |m| m.created_at > last_read && m.sender_id != current_user.id }
+    @first_unread_message_id = first_unread&.id
     @participant&.mark_read!
+    # Quando o destinatário abre a conversa, marcar como "entregue" (2 checks) as mensagens que ainda estavam só "enviadas"
+    mark_received_as_delivered_for_current_user
   end
 
   def create
@@ -97,7 +110,20 @@ class ConversationsController < ApplicationController
 
   def toggle_pin
     participant = @conversation.participants.find_by(user: current_user)
-    participant&.toggle_pin!
+    unless participant
+      redirect_back fallback_location: root_path
+      return
+    end
+    if participant.pinned?
+      participant.update!(pinned: false)
+    else
+      pinned_count = current_user.participants.where(pinned: true).count
+      if pinned_count >= 10
+        redirect_back fallback_location: root_path, alert: "Máximo de 10 conversas fixadas."
+        return
+      end
+      participant.update!(pinned: true)
+    end
     redirect_back fallback_location: root_path
   end
 
@@ -109,5 +135,21 @@ class ConversationsController < ApplicationController
 
   def conversation_params
     params.require(:conversation).permit(:name, :description, :conversation_type, :avatar)
+  end
+
+  # Mensagens enviadas por outros que o usuário ainda não "recebeu" → marcar como entregue (2 checks para o remetente)
+  # perform_now para o remetente ver os 2 checks imediatamente ao abrir a conversa
+  def mark_received_as_delivered_for_current_user
+    @conversation.messages
+      .where.not(sender_id: current_user.id)
+      .where(status: :sent)
+      .pluck(:id)
+      .each do |message_id|
+        message = Message.find_by(id: message_id)
+        next unless message&.status_sent?
+
+        message.mark_delivered!
+        MessageUpdateBroadcastJob.perform_now(message_id)
+      end
   end
 end

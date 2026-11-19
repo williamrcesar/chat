@@ -1,4 +1,4 @@
-module Company
+module CompanyPortal
   class SettingsController < BaseController
     before_action :require_supervisor!
 

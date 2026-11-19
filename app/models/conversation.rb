@@ -22,10 +22,30 @@ class Conversation < ApplicationRecord
       .where(participants: { user_id: user.id })
       .order("participants.pinned DESC, conversations.updated_at DESC")
   }
+  scope :with_open_assignment_for_company, ->(company) {
+    joins(:conversation_assignment)
+      .merge(ConversationAssignment.open)
+      .where(conversation_assignments: { company_id: company.id })
+  }
+
+  scope :globally_active_since, ->(time_ago) {
+    joins(:messages)
+      .where("messages.created_at >= ?", time_ago)
+      .distinct
+  }
 
   def last_message
-    messages.order(created_at: :desc).first
+    messages.order(sequence: :desc, created_at: :desc).first
   end
+
+  # Última reação na conversa (para preview na lista: "Fulano curtiu 👍")
+  def last_reaction
+    MessageReaction.joins(:message).includes(:user)
+      .where(messages: { conversation_id: id })
+      .order("message_reactions.created_at DESC")
+      .first
+  end
+
 
   def unread_count_for(user)
     participant = participants.find_by(user: user)
@@ -46,10 +66,18 @@ class Conversation < ApplicationRecord
     users.where.not(id: current_user.id).first
   end
 
+  # Returns the single direct conversation between two users, or creates it.
+  # Uses a single DB query to avoid duplicates and N+1.
   def self.find_or_create_direct(user_a, user_b)
-    existing = where(conversation_type: :direct).select do |c|
-      c.users.pluck(:id).sort == [ user_a.id, user_b.id ].sort
-    end.first
+    return find_or_create_direct(user_b, user_a) if user_a.id > user_b.id
+
+    existing = joins(:participants)
+      .where(conversation_type: :direct)
+      .where(participants: { user_id: [ user_a.id, user_b.id ] })
+      .where.not(is_company_conversation: true)
+      .group(:id)
+      .having("COUNT(participants.id) = 2")
+      .first
     return existing if existing
 
     transaction do

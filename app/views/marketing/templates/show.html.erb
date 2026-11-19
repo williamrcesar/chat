@@ -53,7 +53,7 @@
         <div>
           <p class="text-[#8696a0] text-xs uppercase font-semibold mb-2">Botões</p>
           <div class="flex flex-wrap gap-2">
-            <% @template.buttons.each do |btn| %>
+            <% @template.buttons_list.each do |btn| %>
               <span class="border border-[#00a884] text-[#00a884] text-xs px-3 py-1.5 rounded-lg">
                 <%= btn["label"] %>
                 <span class="text-[#8696a0] ml-1">(<%= btn["type"] %>)</span>

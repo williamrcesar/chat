@@ -31,6 +31,9 @@
             <p class="text-[#8696a0] text-sm mt-0.5">Template: <%= campaign.marketing_template.name %></p>
           </div>
           <div class="flex items-center gap-2">
+            <% if campaign.status_draft? %>
+              <%= link_to "Editar", edit_marketing_campaign_path(campaign), class: "text-[#00a884] hover:text-[#02966f] text-xs font-semibold", onclick: "event.stopPropagation()" %>
+            <% end %>
             <% badge_class = case campaign.status
                when "running"   then "bg-green-500/20 text-green-400"
                when "paused"    then "bg-yellow-500/20 text-yellow-400"

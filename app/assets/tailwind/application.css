@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* Safelist: classes geradas dinamicamente em Ruby que o scanner do Tailwind não detecta */
+@source inline("text-8xl text-7xl text-5xl text-4xl");

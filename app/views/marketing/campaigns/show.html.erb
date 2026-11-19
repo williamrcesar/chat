@@ -10,12 +10,7 @@
   <div class="flex-1">
     <div class="flex items-center gap-3">
       <h1 class="text-xl font-semibold text-white"><%= @campaign.name %></h1>
-      <% badge_class = case @campaign.status
-         when "running"   then "bg-green-500/20 text-green-400"
-         when "paused"    then "bg-yellow-500/20 text-yellow-400"
-         when "completed" then "bg-blue-500/20 text-blue-400"
-         else                  "bg-[#2a3942] text-[#8696a0]"
-         end %>
+      <% badge_class = { "running" => "bg-green-500/20 text-green-400", "paused" => "bg-yellow-500/20 text-yellow-400", "completed" => "bg-blue-500/20 text-blue-400" }.fetch(@campaign.status, "bg-[#2a3942] text-[#8696a0]") %>
       <span class="<%= badge_class %> text-xs px-2.5 py-1 rounded-full font-semibold capitalize">
         <%= @campaign.status %>
       </span>
@@ -27,6 +22,10 @@
   </div>
 
   <div class="flex gap-2">
+    <% if @campaign.status_draft? %>
+      <%= link_to "Editar", edit_marketing_campaign_path(@campaign),
+            class: "bg-[#2a3942] hover:bg-[#3b4a54] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-[#3b4a54]" %>
+    <% end %>
     <% if @campaign.status_draft? || @campaign.status_paused? %>
       <%= button_to launch_marketing_campaign_path(@campaign), method: :post,
             class: "bg-[#00a884] hover:bg-[#02966f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors" do %>
@@ -65,7 +64,7 @@
      data-kanban-campaign-id-value="<%= @campaign.id %>">
 
   <div class="flex gap-4 min-w-max">
-    <% KANBAN_COLUMNS = [
+    <% kanban_columns = [
       { key: "queued",    label: "Fila",      color: "border-[#8696a0]",  header: "bg-[#2a3942]" },
       { key: "sent",      label: "Enviado",   color: "border-[#3b4a54]",  header: "bg-[#3b4a54]" },
       { key: "delivered", label: "Entregue",  color: "border-[#00a884]/40", header: "bg-[#00a884]/20" },
@@ -73,8 +72,7 @@
       { key: "clicked",   label: "Clicou",    color: "border-[#25d366]/40", header: "bg-[#25d366]/20" },
       { key: "failed",    label: "Falhou",    color: "border-red-500/40",   header: "bg-red-500/20" }
     ] %>
-
-    <% KANBAN_COLUMNS.each do |col| %>
+    <% kanban_columns.each do |col| %>
       <% deliveries = @deliveries_by_status[col[:key]] || [] %>
       <div class="w-64 flex-shrink-0 flex flex-col rounded-xl border <%= col[:color] %> overflow-hidden"
            data-kanban-target="column"
@@ -100,12 +98,14 @@
                  data-kanban-target="card"
                  data-delivery-id="<%= delivery.id %>">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-[#6a7175] flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
-                  <%= delivery.recipient_user.display_name.first.upcase %>
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 <%= delivery.unresolved? ? 'bg-red-500/30' : 'bg-[#6a7175]' %>">
+                  <%= delivery.display_recipient.to_s.first.upcase %>
                 </div>
-                <div class="min-w-0">
-                  <p class="text-white text-xs font-semibold truncate"><%= delivery.recipient_user.display_name %></p>
-                  <% if delivery.recipient_user.nickname.present? %>
+                <div class="min-w-0 flex-1">
+                  <p class="text-white text-xs font-semibold truncate"><%= delivery.display_recipient %></p>
+                  <% if delivery.unresolved? %>
+                    <p class="text-red-400 text-xs">Usuário não encontrado</p>
+                  <% elsif delivery.recipient_user.nickname.present? %>
                     <p class="text-[#8696a0] text-xs">@<%= delivery.recipient_user.nickname %></p>
                   <% end %>
                 </div>

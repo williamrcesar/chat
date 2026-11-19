@@ -13,6 +13,7 @@ module Chat
 
     config.time_zone = "America/Sao_Paulo"
     config.i18n.default_locale = :"pt-BR"
+    config.i18n.available_locales = [ :"pt-BR", :en ]
 
     # Use Sidekiq for background jobs
     config.active_job.queue_adapter = :sidekiq
