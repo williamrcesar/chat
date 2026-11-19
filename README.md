@@ -4,6 +4,8 @@ A full-featured WhatsApp-like messaging web app built with Ruby on Rails 7.2. Re
 
 ---
 
+Validation results and remaining provider/runtime checks: [docs/VALIDATION.md](docs/VALIDATION.md). Current feature inventory: [docs/FEATURES_AND_BACKLOG.md](docs/FEATURES_AND_BACKLOG.md).
+
 ## Tech Stack
 
 | Layer          | Technology                                   |

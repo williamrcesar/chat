@@ -19,9 +19,9 @@ class CallChannel < ApplicationCable::Channel
     path = if data["conversation_id"].present?
              conv = Conversation.find_by(id: data["conversation_id"])
              conv ? Rails.application.routes.url_helpers.conversation_path(conv) : Rails.application.routes.url_helpers.conversations_path
-           else
+    else
              Rails.application.routes.url_helpers.conversations_path
-           end
+    end
     WebPushNotificationJob.perform_later(
       caller.id,
       { title: "Chamada atendida", body: "#{current_user.display_name} atendeu", data: { path: path, tag: "call" } }

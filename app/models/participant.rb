@@ -82,16 +82,16 @@ class Participant < ApplicationRecord
   def notification_icon_token
     type = effective_notification_icon_type
     payload = case type
-              when "avatar"
+    when "avatar"
                 other = conversation.other_user(user)
                 { type: "avatar", conversation_id: conversation_id, other_user_id: other&.id }
-              when "color"
+    when "color"
                 { type: "color", color: effective_notification_color.presence || "#00a884" }
-              when "custom_image"
+    when "custom_image"
                 { type: "custom_image", participant_id: id }
-              else
+    else
                 { type: "avatar", conversation_id: conversation_id, other_user_id: conversation.other_user(user)&.id }
-              end
+    end
     Rails.application.message_verifier(:notification_icon).generate(payload, expires_in: 24.hours)
   end
 
